@@ -74,7 +74,10 @@ char messageCheck(unsigned long int *canId)
     {
       if (canRunning==0)
 	{
-	  canRunning=1; // discards the first message in CAN subsystem
+	  canRunning=1;
+	  CAN.readMsgBuf(&CANlen,CANbuf);
+	  // drain the buffer;
+	  // effective of  discarding the first message in CAN subsystem
 	}
 	else
 	  { 

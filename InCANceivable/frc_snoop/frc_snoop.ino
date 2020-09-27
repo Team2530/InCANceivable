@@ -204,8 +204,8 @@ void loop() {
       {
         // arcane knowledge that the data block contains two ints, cast the data type
         unsigned int *d = (unsigned int*)buf;
-        Serial.println("This is a message containg pin status data (2 bit masked integers)");
-        Serial.println("Low integer contains bits");
+        Serial.println("This is a message containg pin status data (4 bit masked integers)");
+        Serial.println("First 16 bit integer contains bits");
         for (unsigned int mask = 0x8000; mask; mask >>= 1)
         {
           Serial.print(mask & d[0] ? '1' : '0');
@@ -213,7 +213,7 @@ void loop() {
         Serial.println();
         Serial.println("5432109876543210");
         Serial.println("     1");
-         Serial.println("High integer contains bits");
+        /* Serial.println("High integer contains bits");
         for (unsigned int mask = 0x8000; mask; mask >>= 1)
         {
           Serial.print(mask & d[1] ? '1' : '0');
@@ -221,6 +221,7 @@ void loop() {
         Serial.println();
         Serial.println("5432109876543210");
         Serial.println("     1");
+        */
       }
     } // closes check to make sure this isn't first datum
   } // closes check for data

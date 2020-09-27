@@ -1,195 +1,227 @@
 #include <FRC_CAN_utils.h>
 #include <FRC_CAN.h>
 #include <mcp_can.h>
+#include <InCANceivable.h>
+// this is a bit more sophisticated than (for example) the write_test.ino or frc_snoop.ino in this package
+// Those both had clocks that were just free running and polled for data as fast as possible. This uses InCANceivable
+// functions to configure the CAN bus to "do the right thing" for most (all?) practical FRC reasons.
 
-
-// globals for CAN bus 
-const int SPI_CS_PIN = 17; 
-MCP_CAN CAN(SPI_CS_PIN);
-unsigned char CANflagRecv=0;
-unsigned char CANlen=0;
+extern MCP_CAN CAN;  // FRC_CAN_utils provides this
+extern unsigned char canRunning = 0; // InCANceivable provides this
+extern unsigned char CANflagRecv = 0; // InCANceivable provides this too
+unsigned char CANlen = 8;
 unsigned char CANbuf[8];
-char canRunning=0;
-// this is the callback function for the interrupt
-// in loop() we make a quick check the flag and 
-// read if data is available rather than reading 
-// here 
-void MCP2515_ISR()
-{
-    CANflagRecv=1;
-}
-void CANConfigureMasks()
-{
- // Nasty hardwre knowledge required here (read the MCP2515 chip data sheet)  
- // there are two filter banks;  filter bank 0 has 2 masks 
- // filter bank 1 has 4 masks.  I *think* that design idea was that you could 
- // actually buffer two messages in hardware  -- the example code available online 
- // does not implement that.  We really only need to listen to two families of ID's
- // the zero address for broadcast and the robot controller (RoboRio) 
- // The way this works it given an ID on the wire, apply the mask, then see if what is
- // left matches a filter. 
-  CAN.init_Mask(0,FRC_EXT,FRC_DEVICE_MASK | FRC_MANUFACT_MASK); // accept based on DEVICE AND MANUFACTURER
-  CAN.init_Mask(1,FRC_EXT,0);  // turn off input filter bank 1 entirely
-  CAN.init_Filt(0,FRC_EXT,0); // accept the broadcast device
-  CAN.init_Filt(1,FRC_EXT,RIO_MASK); // accept data from the RIO
-}
 
-// globals for analog ultrasound 
-const int analogUSPinOut=4;
-const int analogUSPinIn=5;
-int analogUSMaxRange=90;  // in mm
+
+
+// globals for analog ultrasound
+// the analog ultrasound is noisy so we build up a small number of measurements and average them
+// the last "analogUSBufSz" measurements are kept in analogUSHistory and output is "numAverage" of the most
+// recent measurements.
+// Note that the analogUSHistory is used as a "ring buffer" and analogUSIndex tells us where we have most recently
+// written
+// Note that we have assumed you have one and only one analogUSRange finder per unit.  That is not a necessary constraint
+// but generalizing makes the code heavier.
+const int analogUSPinOut = 6; // goes to hardware trigger pin
+const int analogUSPinIn = 5; // goes to hardware echo pin
+int analogUSMaxRange = 1000; // in mm
+int analogUSMinRange = 40; // in mm
 #define analogUSBufSz 50
 float analogUSHistory[analogUSBufSz];
-char analogUSIndex=0;
-int numAverage=10; 
-// 
+unsigned int analogUSIndex = 0;
+int numAverage = 10;
+//
 int initAnalogUSRange(int outPin, int inPin)
 {
-// pretty simple, we just set the pin for digital i/o 
-  pinMode(outPin,OUTPUT);
-  pinMode(inPin,INPUT);
+  // pretty simple, we just set the pins for digital i and o
+  // to emit ultrasound you need an output pin
+  // to listen for changes in the echo you need an input pin
+  pinMode(outPin, OUTPUT);
+  pinMode(inPin, INPUT);
 }
 //
 float averageUSRange()
-{ 
-  // USRange data is in a ring buffer so we have to a little math to figure out what to average
-
-float sum=0;
-int i=0;
-int ii;
-for (i=0; i<analogUSBufSz; i++)
 {
-   ii=analogUSIndex-i+1;
-   if (ii<0)
-   {
-   ii=ii+analogUSBufSz;
-  } 
-  sum=sum+analogUSHistory[ii];
+  // USRange data is in a ring buffer so we have to a little math to figure out what to average
+  float sum = 0;
+  int i = 0;
+  // the way we are managing the counter is that the analogUSIndex is the next slot to be filled
+  // so it's not valid data --- we want the "numAverage" bins just behind analogUSIndex 
+  int ringIndex=analogUSIndex-numAverage-1;
+
+  for (i = 0; i < numAverage; i++)
+  {
+    int tmpIndex=ringIndex;
+    if (tmpIndex<0)
+    { 
+      tmpIndex=tmpIndex+analogUSBufSz;
+      ringIndex++;
+    }
+    else
+    { 
+      ringIndex++;
+      ringIndex=ringIndex % analogUSBufSz;      
+    }
+    sum= sum + analogUSHistory[tmpIndex];
+    //Serial.println(ringIndex);
+  }
+  //Serial.println(sum);
+  return (sum / numAverage);
 }
-  return(sum/analogUSBufSz);
-}
- 
+
 float getAnalogUSRange(int outPin, int inPin)
+// Get a value from the range finder -- this is at the hardware level, not a smoothed average etc
+// The returned value is what you would stuff into analogUSHistory[] buffer.
 //  the analog ultrasonic range finder is rated for
 // ~4cm to 4m.  the sensor is really simple you send out a US for a while
 //  then poll in a very tight loop listening until the pulse goes away
-//  If the distances are large the time can be relatively long so we also 
+//  If the distances are large the time can be relatively long so we also
 //  enable a clipping  -- for example if the distance is more than analogUSMaxRange
-//  we don't really care how much more... 
+//  we don't really care how much more...
 //  We will assume 343,300 mm/s for speed of sound in air (ignore humidity and altitude)
-//  That is 0.3433 mm / micro sec, but we weill be measuring out-and-back so use half the number of tics  
+//  That is 0.3433 mm / micro sec, but we weill be measuring out-and-back so use half the number of tics
+
 {
-float microSecTomm = 0.343 * 0.5  ;  // the 0.5 is since microsecs we measure are round trip.
-float ret=0.0;
-float echoTime;
+  float microSecTomm = 0.343 * 0.5  ;  // the 0.5 is since microsecs we measure are round trip.
+  float ret = 0.0;
+  unsigned long echoTime;
+  unsigned long int maxMicroSec;
+  maxMicroSec = ceil(analogUSMaxRange / microSecTomm);
+  digitalWrite(outPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(outPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(outPin, LOW);
+  echoTime = pulseIn(inPin, HIGH, maxMicroSec);
+  if (echoTime == 0)
+  {
+    ret = analogUSMaxRange;
+  }
+  else
+  {
 
-unsigned long int maxMicroSec;
-maxMicroSec=ceil(analogUSMaxRange/microSecTomm);
-digitalWrite(outPin, HIGH);
-delayMicroseconds(10); 
-digitalWrite(outPin, LOW);
-echoTime = pulseIn(inPin, HIGH,maxMicroSec);    
- //use the pulsein command to see how long it takes for the
- //pulse to bounce back to the sensor
-ret=echoTime*microSecTomm;
-return(ret);
-} 
+    // echoTime = pulseIn(inPin, HIGH);
+    //use the pulsein arduino function to see how long it takes for the
+    //pulse to bounce back to the sensor
+    // pulseIn is a dead polling loop -- this effectively halts the arduino from doing anything else
+    // until it's done or maxMicroSec have passed.
+    //Serial.println(echoTime);
+    ret = echoTime * microSecTomm;
+    if (ret<analogUSMinRange)
+    ret=analogUSMinRange;
+    // Serial.println(ret);
+  }
+  return (ret);
+}
+// End of stuff to handle the data from the analog US range finder
+unsigned long int DeviceMask = 0;
 
- 
 void setup()
 {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  FRC_CAN_init();
+  delay(100); // allow serial to get going so that subsequent functions can scream if there are problems.
+  DeviceMask = FRC_CAN_init();
   CANConfigureMasks();
- 
- initAnalogUSRange(analogUSPinOut,analogUSPinIn); 
+  initAnalogUSRange(analogUSPinOut, analogUSPinIn);
 }
-unsigned long int lastDumpMillis=0;
-unsigned long int millisBetweenDumps=200;  
 
-void loop() 
+// we will drop data on the CANbus targetting a message every millisBetweenDump (millis= milliseconds)
+// We could make millisBetweenDumps really small, but keep in mind, we need to NOT flood the CAN bus killing off
+// other control messages
+unsigned long int lastDumpMillis = 0;
+unsigned long int millisBetweenDumps = 200;
+long int millisInWriteLoop=0;
+long int millisInLoop=0;
+void loop()
 {
   float USrange;
   unsigned long int now;
+  millisInLoop=millisInLoop-millis();
   if (CANflagRecv)
-{
-  if (canRunning) // see note in else block
   {
-   unsigned long canId = CAN.getCanId();
-   CAN.readMsgBuf(&CANlen,CANbuf);  
-   CANflagRecv=0;  // as soon as we've moved our data out reset that flag; 
-   // the idea being that this could keep open the possibility for interrupt
-   // to catch another bus msg
-     if (FRC_CAN_isBroadcast(canId))
-        { 
-          Serial.println("--BROADCAST MESSAGE BEING HANDLED --");
-          Serial.println(canId, HEX); 
-          FRC_CAN_handleBroadcast(canId);
-        }
-        else
-        {  // not a broadcast message -- probably from the RIO
-        // for now we are just dumping the message -- intelligent parsing needs to be done here
-        Serial.println("-----------------------------");
-        Serial.println("Get data from ID: ");
-        //Serial.println(canId, BIN);
-        for (unsigned long int mask = 0x80000000; mask; mask >>= 1) {
-           Serial.print(mask&canId?'1':'0');
-        }
-        Serial.println();
-        Serial.println("10987654321098765432109876543210");
-        Serial.println(" 3         2         1");
-        Serial.print("Length of data received: ");
-        Serial.println(CANlen); 
-        for(int i = 0; i<CANlen; i++)    // print the data
-        {
-            Serial.print(CANbuf[i], HEX);
-            Serial.print("\t");
-        }
-        Serial.println();
-        Serial.println("FRC-specific deconstruction");
-        Serial.print("Device type: ");
-        Serial.print((canId >> FRC_DEVICE_SHIFT) & FRC_DEVICE_MASK, HEX);
-        Serial.print(" Manufacurer Number: ");
-        Serial.println((canId >> FRC_MANUFACT_SHIFT) & FRC_MANUFACT_MASK, HEX); 
-        Serial.print("ClassNum: ");
-        Serial.print((canId >> FRC_CLASS_SHIFT) & FRC_CLASS_MASK, HEX);
-        Serial.print(" ClassIndex: ");
-        Serial.print((canId >> FRC_CLINDEX_SHIFT) & FRC_CLINDEX_MASK, HEX);
-        Serial.print(" Device Instance Number: ");
-        Serial.println((canId >> FRC_DEVNUM_SHIFT) & FRC_DEVNUM_MASK ,HEX);
-        }
+    if (canRunning == 0)
+    {
+      // we have a message but it's the first one -- it's quite probably garbage
+      // read the buffer and set canRunning=1
+      CAN.readMsgBuf(&CANlen, CANbuf);
+      canRunning = 1;
+    }
+    else
+    {
+      // normal operation  -- we got a message -- we have set up the CAN chipset to only receive messages
+      // from broadcast or ROBOrio
+      unsigned long canId = CAN.getCanId();
+      CAN.readMsgBuf(&CANlen, CANbuf);
+      CANflagRecv = 0; // as soon as we've moved our data out reset the  flag;
+      // the idea being that this could keep open the possibility for interrupt
+      // to catch another bus msg which we may want to prioritize above doing our "day job" of 
+      // reading sensor(s) and occasionally sending data out.
+      
+      if (FRC_CAN_isBroadcast(canId))
+      {
+        //Serial.println("--BROADCAST MESSAGE BEING HANDLED --");
+        //Serial.println(canId, HEX);
+        FRC_CAN_handleBroadcast(canId);
+        // as of 20200926 handleBroadcast is pretty limited -- it mostly respects the "STOP" command, but that functionality 
+        // may be expanded in the future. 
+      }
+      else
+      { 
+        InCANceivable_msg_dump(canId); 
+        // We could do something with the message here ; for now we are just printing it to the terminal
+        // This is just toy code focused on reading sensor, doing a little data massage (averaging), and writing messages
+      }
+    }
   }
-  else
-  { 
-    // at startup there may be a message in the can bus that is garbage 
-    // we get here if it's our first message; we didn't do any processing 
-    // set the flag so we will start processing new messages
-    canRunning=1;
-  }
-} 
-// depending on how long it took us to handle the messages, it is (theoretically) possible 
-// that another message was received.  It's more important to handle that than it is to read the sensors and send data 
-// if CANflagRecv has been reset then skip processing and let loop() start over 
-if (!CANflagRecv) 
-{ // read sensors, updating internal data;  if enough time past make output message(s)
-  now = millis();
-  if (now > (lastDumpMillis+millisBetweenDumps))
-  // if enough time has elapsed since the last time we wrote data then emit data
-  {
-    float *buf=(float*)CANbuf; // make type casting obvious
-    unsigned long int messageID;
-    Serial.println("DUMP");
-    messageID=FRC_CAN_embed(INCAN_MASK,INCAN_CL_ANAUS, INCAN_ANAUS_DATA);
-    buf[0]=averageUSRange();
-    buf[1]=analogUSHistory[analogUSIndex];
-    CAN.sendMsgBuf(messageID,FRC_EXT, CANlen, CANbuf);
-    lastDumpMillis=now;
-  } // end of send data messages 
-  // handle the sensors 
-  analogUSHistory[analogUSIndex]=getAnalogUSRange(analogUSPinOut,analogUSPinIn);
-  analogUSIndex++;
-  analogUSIndex= analogUSIndex % analogUSBufSz;
-} // end of send data messages and update sensor data 
-  
+  // depending on how long it took us to handle the messages, it is (theoretically) possible
+  // that another message was received.  Assume it's more important to handle that than it is
+  // to read the sensors and send data. So make a quick check that CANflagRecv is still set to false
+  // -- if it's false then read the sensor data,  if it's true don't do anything else start a new
+  // pass through loop() function.
+  if (!CANflagRecv)
+  { // read sensors, updating internal data every time ; AND if enough time past make output message(s)
+    // handle the sensors
+    analogUSHistory[analogUSIndex] = getAnalogUSRange(analogUSPinOut, analogUSPinIn);
+    analogUSIndex = analogUSIndex+1;
+    analogUSIndex = analogUSIndex % analogUSBufSz; // ring buffer index wrap around
+    
+    now = millis();
+    if (now > (lastDumpMillis + millisBetweenDumps))
+    {
+      millisInWriteLoop=millisInWriteLoop-millis();
+      //  enough time has elapsed since the last time emitted data then emit data now
+      float *buf = (float*)CANbuf; // make type casting obvious
+      unsigned long int messageID;
+      //      Serial.println("Dumping message data on CANBus");
+      messageID = FRC_CAN_embed(DeviceMask, INCAN_CL_ANAUS, INCAN_ANAUS_DATA);
+      buf[0] = averageUSRange(); 
+      buf[1] = analogUSHistory[analogUSIndex];
+      CAN.sendMsgBuf(messageID, FRC_EXT, CANlen, CANbuf);
+      //Serial.println(buf[1]);
+      //Serial.println(buf[0]);
+      // Educational Note: if you uncomment either of lines above and aren't injecting any other 
+      // print's then you can use the SerialPlotter in the ArduinoIDE to see the data stream 
+      // You might want to do that so you get a feel for how noisy the data is.  
+      // For example,  buf[0] is an average over the last "numAverage" bins (numAverage is defined above)
+      // buf[1] is just the last measurement and it's almost certainly "noisier" than the average.
+      // the downside of averaging is that it is averaging over time -- so if the physical distance is changing rapidly 
+      // the average will not keep up.  HOWEVER, we only hit this code every "millisBetweenDumps" so that also limits the 
+      // speed of changes you can actually see.  There is some rudimentary instrumentation in the code to estimate the 
+      // fraction of time spent actually measuring data vs dumping data.     
+      lastDumpMillis = now; 
+      // note that we use the "now" from before when we started writing -- if writing took a long time (or a 
+      // wildy varying time, then using the "now" helps insure we start at the right time for the next loop 
+      // and don't accumulate a lag   
+      millisInWriteLoop=millisInWriteLoop+millis();
+    } // end of send data messages
+  } // end of send data messages and update sensor data
+  millisInLoop=millisInLoop+millis();
+  // Serial.println(millisInWriteLoop);
+  // Serial.println(float(millisInWriteLoop)/float(millisInLoop));
+ // 20200926 -- checked by uncommenting the above code:   millisInWriteLoop is rarely updated (e.g. we don't spend a 
+ // lot of time in loop writing data out 
+ // the fraction of time we spend writing data out is about 2%.  If you uncomment printing and are running a fast 
+ // serial connection (115k baud here) it doesnt' seem to matter much.  If we turned it down to say 300baud it would probably
+ // matter (exercise left to the reader).   
 } // end of loop
