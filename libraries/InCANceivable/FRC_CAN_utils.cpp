@@ -1,4 +1,4 @@
-#include <FRC_CAN_UTILS.h> 
+#include <FRC_CAN_utils.h>
 #include <FRC_CAN.h>
 #include <mcp_can.h>
 #include <math.h>
@@ -56,8 +56,10 @@ int FRC_CAN_isBroadcast(unsigned long int canId)
   int ret;
   unsigned long int tmp;
   tmp=canId & ( FRC_DEVICE_MASK | FRC_MANUFACT_MASK );
+  //Serial.println(tmp);
+  
   ret= (tmp==0);
- 
+  // Serial.println(ret);
     return(ret);
 }
 
@@ -75,6 +77,7 @@ int FRC_CAN_handleBroadcast(unsigned long int canId)
     ret=msgClindex ;  // demote class 
     if (ret==FRC_BROADCAST_DISABLE)
       {
+	Serial.println("FRC CRASH being called");
 	FRC_CRASH(0);
       }
     else

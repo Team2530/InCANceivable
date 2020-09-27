@@ -2,7 +2,7 @@
 #define INCANCEIVABLE_INCLUDED 
 #include <FRC_CAN_utils.h>
 #include <FRC_CAN.h>
-#include <MCP_CAN.h>
+#include <mcp_can.h>
 /* The InCANceivable project has three software layers to put data onto the CAN bus in an FRC compatible way.  
  InCANceivable is the most abstract;  it relies on functions in FRC_CAN_utils.h which in turn rely on FRC_CAN.h.
  
