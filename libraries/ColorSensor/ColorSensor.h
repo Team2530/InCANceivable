@@ -9,6 +9,8 @@
 #define BALL_BLUE 3
 #define BALL_NONE 4
 
+extern uint16_t baseProxReadings[2];
+
 typedef struct Color {
     float r, g, b;
 } Color;
@@ -99,5 +101,6 @@ Color getColorSensorColor(unsigned char addr = COLORSENSORV3_ADDR);
 int detectBalls(unsigned char* states, int nsensors = 2);
 void getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
 void switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
+void calibrateBallDetection(unsigned char channel = COLORSENSORV3_ADDR);
 
 #endif

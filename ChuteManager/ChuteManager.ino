@@ -59,7 +59,7 @@ void setup() {
   // devices -- if each is in it's own library it may be
   // ugly to avoid name clashes
   Wire.begin();
-  Wire.setClock(3400000);
+  Wire.setClock(400000);
   switchMux(0);
   initColorSensor();
   switchMux(1);
@@ -68,7 +68,7 @@ void setup() {
   //while (!Serial) {
   //  ;
   //}
-
+  calibrateBallDetection();
 }
 
 void loop() {

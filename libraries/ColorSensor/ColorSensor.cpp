@@ -1,5 +1,8 @@
 #include "ColorSensor.h"
 
+// Readings from the sensors when there isnt anything inside the chute.
+extern uint16_t baseProxReadings[2] = { 0, 0 }; // Add more if needed
+
 uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg) {
     uint32_t data;
 
@@ -72,7 +75,7 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
     for (int i = 0; i < nsensors; ++i) {
         switchMux(i);
         getChannels(channels);
-        if (getColorSensorProximity() < 400) {
+        if (getColorSensorProximity() < baseProxReadings[i]/2) {
             states[i] = BALL_NONE;
         } else if (channels[0] > channels[2]) {
             states[i] = BALL_RED;
@@ -96,4 +99,11 @@ void switchMux(unsigned char channel, unsigned char mux_addr) {
     Wire.beginTransmission(mux_addr);
     Wire.write(1 << channel);
     Wire.endTransmission();
+}
+
+void calibrateBallDetection(unsigned char addr) {
+    for (int i = 0; i < 2; ++i) {
+        switchMux(i);
+        baseProxReadings[i] = getColorSensorProximity();
+    }
 }
