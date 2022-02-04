@@ -30,7 +30,7 @@ on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place 
 // where L indicates that the variable is a an unsigned long int
 // 
 // Then you would like to make it straight forward to deconstruct an Arbitration ID
-#define FRC_DEVICE_MASK 0x1ffL 
+#define FRC_DEVICE_MASK 0x1fL 
 #define FRC_MANUFACT_MASK 0xffL
 #define FRC_CLASS_MASK 0x3fL
 #define FRC_CLINDEX_MASK 0xfL
@@ -74,7 +74,7 @@ on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place 
 #define INCAN_CL_ANAUS 16L  // Analog Ultrasound/ 
 #define INCAN_CL_GPIO 20L // I2c 4 pin GPIO 
 #define INCAN_CL_SLED 25L // Addressable Strip LED
-
+#define INCAN_CL_CHUTE 32L // 
 // not all of the defines below are supported -- this is lifted from the can-addressing.html 
 // page from wpilip,org 
 #define FRC_BROADCAST_DISABLE 0

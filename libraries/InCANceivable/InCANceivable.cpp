@@ -4,36 +4,60 @@
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
 
 int verbose=1;
+extern unsigned char CANflagRecv;
 
 void MCP2515_ISR()
 {
-    CANflagRecv=1;
+  Serial.println("interrupt");
+  CANflagRecv=1;
 }
 
 void InCANceivable_setup()
 {
- CANConfigureMasks();
+  //  const int CAN_INT_PIN=0;
+  CANConfigureMasks();
+  //  attachInterrupt(0, &MCP2515_ISR, FALLING); 
+
+  // Serial.println("Done attaching interrupt");
 } 
 
-void CANConfigureMasks()
+void CANConfigureMasks()  // this should have mycanid as an argument
+
 {
  // Nasty hardwre knowledge required here (read the MCP2515 chip data sheet)  
  // there are two filter banks;  filter bank 0 has 2 masks 
  // filter bank 1 has 4 masks.  I *think* that design idea was that you could 
  // actually buffer two messages in hardware  -- the example code available online 
- // does not implement that.  We really only need to listen to two families of ID's
- // the zero address for broadcast and the robot controller (RoboRio) 
- // The way this works it given an ID on the wire, apply the mask, then see if what is
- // left matches a filter. 
-
-  CAN.init_Mask(0,FRC_EXT,FRC_DEVICE_MASK | FRC_MANUFACT_MASK); // accept based on DEVICE AND MANUFACTURER
-  CAN.init_Mask(1,FRC_EXT,0);  // turn off input filter bank 1 entirely
-  CAN.init_Filt(0,FRC_EXT,0); // accept the broadcast device
-  CAN.init_Filt(1,FRC_EXT,RIO_MASK); // accept data from the RIO
-  // CAN.init_Filt(2 and up are on Mask 1) 
+ // does not implement that.  We really only need to listen to three families of ID's
+ // the zero address for broadcast
+ // the robot controller (RoboRio) 
+ // and stuff with our ID's 
+ // The way this works it given an ID on the wire, apply the mask, then see
+ //  if what is left matches a filter. 
+ //  MASK will reject anything without a good  chance of being valid FRC canId 
+ //  then we will filter out everything that isn't broadcast, rio or InCan
+ // make sure we are pasing unsigned long
+  unsigned long int device_manufact_mask=(FRC_DEVICE_MASK<<FRC_DEVICE_SHIFT) | (FRC_MANUFACT_MASK<<FRC_MANUFACT_SHIFT);  
+  //Serial.print(" device mfg mask :" );
+  //Serial.println(device_manufact_mask,HEX);  
+  CAN.init_Mask(0,FRC_EXT,device_manufact_mask);
+  //CAN.init_Mask(0,FRC_EXT,0);
+  //CAN.init_Filt(0,FRC_EXT,0);
+  CAN.init_Mask(1,FRC_EXT,device_manufact_mask);
+  CAN.init_Filt(0,FRC_EXT,RIO_MASK); 
+  CAN.init_Filt(1,FRC_EXT,INCAN_MASK);
+  CAN.init_Filt(2,FRC_EXT,0); 
+  // the INCAN_MASK is a little bit loose -- if you have two incanceivables on the 
+  // bus this will leak across them -- example, say one is writing messages
+  // about a set of sensor
+  // and the other is reading messages to set LED's 
+  // the one reading messages will have process the other guy's messages 
+  // ("process" here probably means read the mcp chipset and reject based on 
+  // not exactly matching the canId.  Arduino's could update the filters to be
+  // more device specific 
 }
 
-void InCANceivable_msg_dump(unsigned long canId)
+void InCANceivable_msg_dump(unsigned long canId, int len, unsigned  char *buf)
 {
     // just dumping the message 
     Serial.println("-----------------------------");
@@ -46,9 +70,9 @@ void InCANceivable_msg_dump(unsigned long canId)
     Serial.println(" 3         2         1");
     Serial.print("Length of data received: ");
     Serial.println(CANlen); 
-    for(int i = 0; i<CANlen; i++)    // print the data
+    for(int i = 0; i<len; i++)    // print the data
       {
-	Serial.print(CANbuf[i], HEX);
+	Serial.print(buf[i], HEX);
 	Serial.print("\t");
       }
     Serial.println();
@@ -74,10 +98,7 @@ char messageCheck(unsigned long int *canId)
     {
       if (canRunning==0)
 	{
-	  canRunning=1;
-	  CAN.readMsgBuf(&CANlen,CANbuf);
-	  // drain the buffer;
-	  // effective of  discarding the first message in CAN subsystem
+	  canRunning=1; // discards the first message in CAN subsystem
 	}
 	else
 	  { 

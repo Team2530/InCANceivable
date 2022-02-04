@@ -1,8 +1,0 @@
-#ifndef INCANCEIVABLE_GLOBALS_INCLUDED 
-#define INCANCEIVABLE_GLOBAS_INCLUDED 
-
-unsigned char CANflagRecv=0;
-unsigned char CANlen=0;
-unsigned char CANbuf[8];
-unsigned char canRunning=0;
-#endif // INCANCEIVABLE_GLOBALS_INCLUDED

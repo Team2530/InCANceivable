@@ -1,4 +1,4 @@
-#include <FRC_CAN_utils.h>
+#include <FRC_CAN_UTILS.h> 
 #include <FRC_CAN.h>
 #include <mcp_can.h>
 #include <math.h>
@@ -10,6 +10,8 @@ unsigned long int inCAN_makeBaseID(int devNum)
   unsigned long int tmp=0;
   tmp=devNum;
   ret= INCAN_MASK | tmp;
+  Serial.print("CAN BUS device ID:");
+  Serial.println(devNum);
   return(ret);
 }    
 
@@ -47,19 +49,33 @@ int FRC_CAN_HWmatch(unsigned long int canId, unsigned long  int myId, int *devNu
 int FRC_CAN_isMe(unsigned long int canId, unsigned long int myId)
 {  // like HW match but also requires matching device number.
   int ret;
-  unsigned long int myMask=INCAN_MASK || FRC_DEVNUM_MASK;
+
+  unsigned long int myMask=INCAN_MASK | FRC_DEVNUM_MASK;
+  //Serial.print("isME mask ");
+  //Serial.println(myMask, HEX);
   ret=((canId & myMask) == (myId & myMask));
-  return(ret);
-}
+  return(ret);}
+
+
 int FRC_CAN_isBroadcast(unsigned long int canId)
 {
   int ret;
   unsigned long int tmp;
-  tmp=canId & ( FRC_DEVICE_MASK | FRC_MANUFACT_MASK );
-  //Serial.println(tmp);
-  
+  tmp=((canId>>FRC_DEVICE_SHIFT) &  FRC_DEVICE_MASK)  | 
+    ((canId>>FRC_MANUFACT_SHIFT) & FRC_MANUFACT_MASK);
+    
+    
   ret= (tmp==0);
-  // Serial.println(ret);
+  if (ret>0){
+    Serial.print("in FRC_CAN_isBroadcast -- canId is :");
+    Serial.println(canId,HEX);
+    Serial.println("is broadcast!");
+  }
+  //  else{
+  //  Serial.println("is not broadcast!");
+  // }
+
+	   
     return(ret);
 }
 
@@ -77,7 +93,6 @@ int FRC_CAN_handleBroadcast(unsigned long int canId)
     ret=msgClindex ;  // demote class 
     if (ret==FRC_BROADCAST_DISABLE)
       {
-	Serial.println("FRC CRASH being called");
 	FRC_CRASH(0);
       }
     else
@@ -94,13 +109,14 @@ int FRC_CAN_isRIO(unsigned long int canId)
 { // makes strong assumptions about the ID’s of the control computer
 int ret;
  unsigned long int tmp;
- tmp =canId & (FRC_DEVICE_MASK | FRC_MANUFACT_MASK);
+ tmp =canId & RIO_MASK;
  ret=( tmp ==RIO_MASK);
 return(ret);
 }
 
 void FRC_CAN_extractClass(unsigned long canId, int *apiClass, int *apiIndex)
 {
+
   *apiClass = (int) (canId >>FRC_CLASS_SHIFT) & FRC_CLASS_MASK;
   *apiIndex = (int) (canId >>FRC_CLINDEX_SHIFT) & FRC_CLINDEX_MASK;
 }

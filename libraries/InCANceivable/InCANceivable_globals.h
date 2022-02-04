@@ -1,5 +1,5 @@
 #ifndef INCANCEIVABLE_GLOBALS_INCLUDED 
-#define INCANCEIVABLE_GLOBAS_INCLUDED 
+#define INCANCEIVABLE_GLOBALS_INCLUDED 
 
 unsigned char CANflagRecv=0;
 unsigned char CANlen=0;

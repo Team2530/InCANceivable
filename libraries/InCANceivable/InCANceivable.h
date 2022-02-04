@@ -2,6 +2,7 @@
 #define INCANCEIVABLE_INCLUDED 
 #include <FRC_CAN_utils.h>
 #include <FRC_CAN.h>
+//#include <MCP_CAN.h>
 #include <mcp_can.h>
 /* The InCANceivable project has three software layers to put data onto the CAN bus in an FRC compatible way.  
  InCANceivable is the most abstract;  it relies on functions in FRC_CAN_utils.h which in turn rely on FRC_CAN.h.
@@ -27,7 +28,7 @@ void MCP2515_ISR();
 
 void InCANceivable_setup();
 void CANConfigureMasks();
-void InCANceivable_msg_dump(unsigned long canId);
+void InCANceivable_msg_dump(unsigned long canId,int len, unsigned char *buf);
 char messageCheck(unsigned long int *canId); // returns true if there is a message
 // canId, as well as CANlen and CANbuf will have been updated 
 // messageCheck will consume broadcast messages calling FRC_CAN_handleBroadcast() for those 
