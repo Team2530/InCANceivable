@@ -14,6 +14,7 @@ extern MCP_CAN CAN;
 unsigned long myCanID; // Will later be set during initialization
 
 File logFile; // File pointer to SD card
+const char filename[30] = "canlog_0.csv";
 
 void setup() {
   // Start a serial connection for local debugging
@@ -36,9 +37,10 @@ void setup() {
       while(true);
   } Serial.println("SD init OK.");
 
-  // Clear last log
-  if (SD.exists("can.log"))
-    SD.remove("can.log");
+  // Make sure to create a new logfile.
+  for (int logn = 0; SD.exists(filename); ++logn) {
+    sprintf(filename, "canlog_%d.csv", logn);
+  }
 }
 
 void loop() {
@@ -55,7 +57,7 @@ void loop() {
   // CANflagRecv is set to 1 when the interrupt callback is ran.
   if (CANflagRecv) {
     CANflagRecv = 0; // Zero the flag
-    logFile = SD.open("can.log", FILE_WRITE);
+    logFile = SD.open(filename, FILE_WRITE);
     while (CAN_MSGAVAIL == CAN.checkReceive()) {
       // Read the message from buffers in the CAN chip
       CAN.readMsgBufID(&canID, &CANlen, CANbuf);
