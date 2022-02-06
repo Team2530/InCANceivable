@@ -8,11 +8,14 @@
  InCANceivable is the most abstract;  it relies on functions in FRC_CAN_utils.h which in turn rely on FRC_CAN.h.
  
  The idea here is to "do the right thing for most cases" ;  you can always use the FRC_CAN_utils and FRC_CAN 
- directly. 
  
  Most of the variables defined here are global and we don't make any effort to protect them from being clobbered
-*/ 
-const int SPI_CS_PIN = 17; 
+*/
+#ifndef AVR_LEONARDO
+const int SPI_CS_PIN = 9;
+#else
+const int SPI_CS_PIN = 17;
+#endif
 
 extern unsigned char CANflagRecv;
 extern unsigned char CANlen;

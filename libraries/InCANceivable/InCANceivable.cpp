@@ -8,7 +8,7 @@ extern unsigned char CANflagRecv;
 
 void MCP2515_ISR()
 {
-  Serial.println("interrupt");
+  //Serial.println("interrupt");
   CANflagRecv=1;
 }
 
