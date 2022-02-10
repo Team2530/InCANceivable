@@ -42,7 +42,6 @@ unsigned long lastLedRefreshMillis = 0L;
 unsigned long stripProgramRefreshMillis = 30L;
 
 void setup() {
-
   // two lines to set up the CAN functionality
   myCanID = FRC_CAN_init();
   InCANceivable_setup();
@@ -62,10 +61,17 @@ void setup() {
   // ugly to avoid name clashes
   Wire.begin();
   Wire.setClock(3400000);
-  switchMux(0);
-  initColorSensor();
-  switchMux(1);
-  initColorSensor();
+  #if defined(WIRE_HAS_TIMEOUT)
+  Wire.setWireTimeout(1000, true);
+  #endif
+
+  for (int i = 0; i < 2; ++i) {
+    switchMux(i);
+    // initColorSensor returns true on err
+    if (initColorSensor()) {
+      chamberStatus[i] = IDK;
+    }
+  }
 //  Serial.begin(115200);
 //  while (!Serial) {
 //    ;
@@ -147,15 +153,6 @@ void loop() {
     }
   }
 
-  // We've processed CAN -- if currentMillis is more than 100ms newer than lastHeartbeatMillis we have missed the
-  // heartbeats and per FRC should assume that rio is dead.
-  if ((currentMillis - lastHeartbeatMillis) > 100L) {
-    haveHeartbeat = 0;
-    strip.setPixelColor(heartbeatPixel, 139, 0, 0); // dark red
-    strip.show();  // we are not expecting to call this often so no harm in showing
-    // if we are hitting it hard things are broken anyway
-  }
-
   //Serial.println(millis()-currentMillis);
   // read sensors and send message to rio if chamberStatus changed
   // OR if it's been a while
@@ -203,10 +200,41 @@ void loop() {
       }
     }
   }
+  
   // just to help us understand our deadtime -- how variable is it?
   currentMillis = millis();
-  //  Serial.print('loop time:');
-  //Serial.println(currentMillis - loopBeginMillis); // we can use the plotter to peak at this
+
+  // Something took too long to run, maybe one of the I2C devices isn't connected.
+  // So we go through all of the sensors and make sure they are there.
+  // Although, I2C errors should already be handled...
+  // But no matter what, we don't want the board to die from timeout because of something hanging.
+  if (currentMillis - loopBeginMillis > 200) {
+    // Prevent imminent death
+    lastHeartbeatMillis = millis();
+    
+    for (int i = 0; i < 2; ++i) {
+      switchMux(i);
+      Wire.beginTransmission(COLORSENSORV3_ADDR);
+      byte error = Wire.endTransmission();
+      if (error != 0) {
+        chamberStatus[i] = IDK;
+      }
+    }
+  }
+  
+  // Serial.print('loop time:');
+  // Serial.println(currentMillis - loopBeginMillis); // we can use the plotter to peak at this
+
+  // We've processed CAN -- if currentMillis is more than 100ms newer than lastHeartbeatMillis we have missed the
+  // heartbeats and per FRC should assume that rio is dead.
+  // if ((currentMillis -  // We've processed CAN -- if currentMillis is more than 100ms newer than lastHeartbeatMillis we have missed the
+  // heartbeats and per FRC should assume that rio is dead.
+  if ((currentMillis - lastHeartbeatMillis) > 100L) {
+    haveHeartbeat = 0;
+    strip.setPixelColor(heartbeatPixel, 139, 0, 0); // dark red
+    strip.show();  // we are not expecting to call this often so no harm in showing
+    // if we are hitting it hard things are broken anyway
+  }
 }
 
 

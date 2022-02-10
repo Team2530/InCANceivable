@@ -1,14 +1,15 @@
 #include "ColorSensor.h"
 
 // Readings from the sensors when there isnt anything inside the chute.
-extern uint16_t baseProxReadings[2] = { 0, 0 }; // Add more if needed
+uint16_t baseProxReadings[2] = { 0, 0 }; // Add more if needed
 
-uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg) {
+uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* err) {
     uint32_t data;
 
     Wire.beginTransmission(addr);
     Wire.write((unsigned char)reg);
-    Wire.endTransmission(false);
+    if (err != NULL)
+        *err |= Wire.endTransmission(false);
 
     // Request 3 uchars (24 bits)
     Wire.requestFrom(addr, (unsigned char)3);
@@ -18,28 +19,31 @@ uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg) {
     return data & 0x03FFFF;
 }
 
-void write8BitRegister(unsigned char addr, ColorSensorRegister reg, unsigned char data) {
+// Returns true on error
+bool write8BitRegister(unsigned char addr, ColorSensorRegister reg, unsigned char data) {
     Wire.beginTransmission(addr);
     Wire.write((unsigned char)reg);
     Wire.write(data);
-    Wire.endTransmission();
+    return Wire.endTransmission() != 0;
 }
 
-void initColorSensor(unsigned char addr) {
-    write8BitRegister(
+bool initColorSensor(unsigned char addr) {
+    bool err = write8BitRegister(
         addr,
         ColorSensorRegister::MainCtrl,
         ColorSensorMainControlFlags::RGBMode
         | ColorSensorMainControlFlags::LightSensorEnable
         | ColorSensorMainControlFlags::ProximitySensorEnable);
 
-    write8BitRegister(
+    err |= write8BitRegister(
         addr,
         ColorSensorRegister::ProximitySensorRate,
         ColorSensorProximityResolution::Res11bit
         | ColorSensorMeasurementRate::Rate100ms);
 
-    write8BitRegister(addr, ColorSensorRegister::ProximitySensorPulses, (unsigned char)32);
+    err |= write8BitRegister(addr, ColorSensorRegister::ProximitySensorPulses, (unsigned char)32);
+    
+    return err;
 }
 
 uint16_t getColorSensorProximity(unsigned char addr) {
@@ -48,7 +52,7 @@ uint16_t getColorSensorProximity(unsigned char addr) {
     Wire.beginTransmission(addr);
     Wire.write(ColorSensorRegister::ProximityData);
     Wire.endTransmission(false);
-    Wire.requestFrom(addr,(unsigned char) 2);
+    Wire.requestFrom(addr, (unsigned char)2);
     Wire.readBytes((uint8_t*)&d, 2);
 
     return d & 0x7FF; // Mask to 11 bits
@@ -71,28 +75,38 @@ Color getColorSensorColor(unsigned char addr) {
 int detectBalls(unsigned char* oldstates, int nsensors) {
     uint32_t channels[3];
     unsigned char states[8];
-    int ret=0;
+    int ret = 0;
     for (int i = 0; i < nsensors; ++i) {
+        // Sensor has been marked as IDK, which indicates there is some sort of problem.
+        // So don't read it again
+        if (oldstates[i] == BALL_IDK) {
+            continue;
+        }
+
         switchMux(i);
-        getChannels(channels);
-        if (getColorSensorProximity() < baseProxReadings[i]/2) {
+        bool err = getChannels(channels);
+        if (err) {
+            states[i] = BALL_IDK;
+        } else if (getColorSensorProximity() < baseProxReadings[i] / 2) {
             states[i] = BALL_NONE;
         } else if (channels[0] > channels[2]) {
             states[i] = BALL_RED;
         } else {
             states[i] = BALL_BLUE;
         }
-	if (states[i]!=oldstates[i]) ret=1;
-        oldstates[i]=states[i];
+        if (states[i] != oldstates[i]) ret = 1;
+        oldstates[i] = states[i];
     }
-    
+
     return(ret);
 }
 
-void getChannels(uint32_t* rgb, unsigned char addr) {
-    rgb[0] = read20BitRegister(addr, ColorSensorRegister::DataRed);
-    rgb[1] = read20BitRegister(addr, ColorSensorRegister::DataGreen);
-    rgb[2] = read20BitRegister(addr, ColorSensorRegister::DataBlue);
+bool getChannels(uint32_t* rgb, unsigned char addr) {
+    bool err = false;
+    rgb[0] = read20BitRegister(addr, ColorSensorRegister::DataRed, &err);
+    rgb[1] = read20BitRegister(addr, ColorSensorRegister::DataGreen, &err);
+    rgb[2] = read20BitRegister(addr, ColorSensorRegister::DataBlue, &err);
+    return err;
 }
 
 void switchMux(unsigned char channel, unsigned char mux_addr) {

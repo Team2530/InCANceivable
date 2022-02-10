@@ -3,13 +3,13 @@
 
 #include <Wire.h>
 
-#define BALL_UNKNOWN 0
+#define BALL_IDK 0
 #define BALL_RED 1
 #define BALL_GREEN 2
 #define BALL_BLUE 3
 #define BALL_NONE 4
 
-extern uint16_t baseProxReadings[2];
+extern uint16_t baseProxReadings[];
 
 typedef struct Color {
     float r, g, b;
@@ -93,13 +93,13 @@ enum ColorSensorMeasurementRate {
 
 const unsigned char COLORSENSORV3_ADDR = 0x52; // Standard address for REV color sensor V3
 
-uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg);
-void write8BitRegister(unsigned char addr, ColorSensorRegister reg, unsigned char data);
-void initColorSensor(unsigned char addr = COLORSENSORV3_ADDR);
+uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* err = NULL);
+bool write8BitRegister(unsigned char addr, ColorSensorRegister reg, unsigned char data);
+bool initColorSensor(unsigned char addr = COLORSENSORV3_ADDR);
 uint16_t getColorSensorProximity(unsigned char addr = COLORSENSORV3_ADDR);
 Color getColorSensorColor(unsigned char addr = COLORSENSORV3_ADDR);
 int detectBalls(unsigned char* states, int nsensors = 2);
-void getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
+bool getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
 void switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
 void calibrateBallDetection(unsigned char channel = COLORSENSORV3_ADDR);
 
