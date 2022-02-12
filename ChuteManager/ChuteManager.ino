@@ -34,7 +34,7 @@ unsigned char autonomous = 0;
 unsigned char watchdog = 0;
 
 unsigned char userStripProgramNumber = 2;
-unsigned char chamberStatus[2] = {0, 0};
+unsigned char chamberStatus[2] = { 0, 0 };
 unsigned long canRefreshMillis = 1000L;
 // we send a message out on the canBus every 50ms or when the status changes
 
@@ -50,8 +50,7 @@ void setup() {
   strip.begin();
   strip.setBrightness(64);  // if you crank the brightness up you pretty much just burn battery
   // visually it's not a lot different
-  for (int i = 0; i < numLEDs; i++)
-  {
+  for (int i = 0; i < numLEDs; i++) {
     strip.setPixelColor(i, 0, 255, 0);
   }
   strip.show();
@@ -61,9 +60,9 @@ void setup() {
   // ugly to avoid name clashes
   Wire.begin();
   Wire.setClock(3400000);
-  #if defined(WIRE_HAS_TIMEOUT)
-  Wire.setWireTimeout(1000, true);
-  #endif
+#if defined(WIRE_HAS_TIMEOUT)
+  Wire.setWireTimeout(100000, true);
+#endif
 
   for (int i = 0; i < 2; ++i) {
     switchMux(i);
@@ -72,11 +71,11 @@ void setup() {
       chamberStatus[i] = IDK;
     }
   }
-//  Serial.begin(115200);
-//  while (!Serial) {
-//    ;
-//  }
-//  Serial.println("start up done");
+  //  Serial.begin(115200);
+  //  while (!Serial) {
+  //    ;
+  //  }
+  //  Serial.println("start up done");
 }
 
 void loop() {
@@ -88,19 +87,19 @@ void loop() {
   int messageAPIindex;
   unsigned long currentMillis;
   unsigned long loopBeginMillis;
-  static unsigned long benchmarkTime=0;
-  static int loopCount=0;  
+  static unsigned long benchmarkTime = 0;
+  static int loopCount = 0;
   int changed = 0;
   loopCount++;
-  
+
   currentMillis = millis();
-//  if (loopCount==1000){
-//    loopCount=0;
-//     Serial.print("ave loop time (microsec):");
-//     Serial.println((currentMillis-benchmarkTime));
-//     benchmarkTime=currentMillis;
-//  }
-  
+  //  if (loopCount==1000){
+  //    loopCount=0;
+  //     Serial.print("ave loop time (microsec):");
+  //     Serial.println((currentMillis-benchmarkTime));
+  //     benchmarkTime=currentMillis;
+  //  }
+
   loopBeginMillis = currentMillis;
   //Serial.println(".");
   // check the can bus
@@ -108,24 +107,21 @@ void loop() {
     CAN.readMsgBufID(&canID, &CANlen, CANbuf);
     if (canRunning == 0) {
       canRunning = 1; // discard first CAN packet
-    }
-    else {
-//      
+    } else {
+      //      
       if (FRC_CAN_isRIO(canID)) {
         // the RIO sends a universal heartbeat
         unsigned long heartbeatID = 0x01011840;
         //Serial.println("rio");
-       
+
         if (canID == heartbeatID) {
           //Serial.println("beep");
           parseRioHeartbeatByte(CANbuf[4], currentMillis);
           lastHeartbeatMillis = currentMillis;
-        }
-        else{ 
+        } else {
           //InCANceivable_msg_dump(canID,CANlen,CANbuf);
         }
-      }
-      else {       
+      } else {
         //Serial.println("calling isMe");
         if (FRC_CAN_isMe(canID, myCanID)) {
           int apiClass;
@@ -142,8 +138,7 @@ void loop() {
               // can message waiting for us on the next loop pass
               break;
           }
-        }
-        else {
+        } else {
           if (FRC_CAN_isBroadcast(canID)) {
             // empirically this is a rare message
             if (canID == 0) FRC_CRASH(0);
@@ -163,8 +158,7 @@ void loop() {
     sendChamberStatus(chamberStatus, myCanID);
     updateChamberStatusLEDs(chamberStatus);
     lastStatusSendMillis = currentMillis;
-  }
-  else {
+  } else {
     // hasn't changed, if it's been a long time then re-tell the canbus
     // this may be overkill but its relatively cheap insurance in case
     // we are running long before roborio starts or is rebooting etc
@@ -200,7 +194,7 @@ void loop() {
       }
     }
   }
-  
+
   // just to help us understand our deadtime -- how variable is it?
   currentMillis = millis();
 
@@ -211,7 +205,7 @@ void loop() {
   if (currentMillis - loopBeginMillis > 200) {
     // Prevent imminent death
     lastHeartbeatMillis = millis();
-    
+
     for (int i = 0; i < 2; ++i) {
       switchMux(i);
       Wire.beginTransmission(COLORSENSORV3_ADDR);
@@ -221,7 +215,7 @@ void loop() {
       }
     }
   }
-  
+
   // Serial.print('loop time:');
   // Serial.println(currentMillis - loopBeginMillis); // we can use the plotter to peak at this
 
@@ -252,7 +246,7 @@ void stripProgram0(unsigned long now) {
 void stripProgram1(unsigned long now) {
   // implements a toggling pair of patterns r/g and g/r
   static unsigned long lastStart = 0;
-  unsigned long patternTimes[2] = {250, 1000};
+  unsigned long patternTimes[2] = { 250, 1000 };
   static int currentPattern = 2; // initialize out of bounds
   int newPattern;
   int r;
@@ -262,9 +256,9 @@ void stripProgram1(unsigned long now) {
   int userLow = 35;
   unsigned long delta;
   delta = now - lastStart;
-  if(delta>patternTimes[1]){
-    lastStart=now;
-    delta=0;
+  if (delta > patternTimes[1]) {
+    lastStart = now;
+    delta = 0;
   }
   newPattern = 1;
   for (int i = 0; i < 2; i++) {
@@ -272,16 +266,16 @@ void stripProgram1(unsigned long now) {
       newPattern = i;
     }
   }
-//  Serial.print("delta:");
-//  Serial.print(delta);
-// Serial.print(" ");
-//  Serial.println(newPattern);
+  //  Serial.print("delta:");
+  //  Serial.print(delta);
+  // Serial.print(" ");
+  //  Serial.println(newPattern);
   if (newPattern != currentPattern) {
     currentPattern = newPattern;
     //Serial.println(currentPattern);
     switch (currentPattern) {
       case 0:
-  //      Serial.println(0);
+        //      Serial.println(0);
         r = 0; g = 255; b = 0;
         for (int i = userLow; i < userHigh; i += 2) {
           strip.setPixelColor(i, r, g, b);
@@ -292,13 +286,13 @@ void stripProgram1(unsigned long now) {
         }
         break;
       case 1:
-//        Serial.println(1);
-        r = 255; g = 0; b=255;
+        //        Serial.println(1);
+        r = 255; g = 0; b = 255;
         for (int i = userLow; i < userHigh; i += 2) {
           strip.setPixelColor(i, r, g, b);
         }
-        r = 0; g = 255; b =0;
-        for (int i = userLow+ +1; i < userHigh; i += 2) {
+        r = 0; g = 255; b = 0;
+        for (int i = userLow + +1; i < userHigh; i += 2) {
           strip.setPixelColor(i, r, g, b);
         }
         break;
@@ -312,29 +306,29 @@ void stripProgram1(unsigned long now) {
 }
 
 void stripProgram2(unsigned long now) {
-// for fun we'll make tri colored snakes rolling around the leds
-int highLED=70;
-int lowLED=35;
-int snakeRed[15]={0,20,60,120,255,   120,60,20,0,0,  0,0,0,0,0};
-int snakeGreen[15]={0,0,0,0,20, 60,120,255,120,60, 20,0,0,0,0};
-int snakeBlue[15]={0,0,0,0,0, 0,0,20,60,120, 255,120,60,20,0};
-static unsigned long lastUpdate=0;
-unsigned long updateTime=75L;
-static int offset=0;
+  // for fun we'll make tri colored snakes rolling around the leds
+  int highLED = 70;
+  int lowLED = 35;
+  int snakeRed[15] = { 0,20,60,120,255,   120,60,20,0,0,  0,0,0,0,0 };
+  int snakeGreen[15] = { 0,0,0,0,20, 60,120,255,120,60, 20,0,0,0,0 };
+  int snakeBlue[15] = { 0,0,0,0,0, 0,0,20,60,120, 255,120,60,20,0 };
+  static unsigned long lastUpdate = 0;
+  unsigned long updateTime = 75L;
+  static int offset = 0;
 
- if ((now-lastUpdate)>updateTime){
-  //Serial.println("prog 2");
-  lastUpdate=now;
-   for (int i=0;i<(highLED-lowLED);i++){
-      int colorIndex=(i+offset)%15; // mod the length of the snake<color> arrays
-      strip.setPixelColor(i+lowLED,snakeRed[colorIndex],snakeGreen[colorIndex],snakeBlue[colorIndex]);
-   }
-   // in theory we could just let offset run on forever -- but it's a 16bit int and will eventually roll over
-   // clamp it now
-   offset++;
-   offset=offset%(highLED-lowLED);  // mode the length of the section leds
- }
- strip.show();
+  if ((now - lastUpdate) > updateTime) {
+    //Serial.println("prog 2");
+    lastUpdate = now;
+    for (int i = 0;i < (highLED - lowLED);i++) {
+      int colorIndex = (i + offset) % 15; // mod the length of the snake<color> arrays
+      strip.setPixelColor(i + lowLED, snakeRed[colorIndex], snakeGreen[colorIndex], snakeBlue[colorIndex]);
+    }
+    // in theory we could just let offset run on forever -- but it's a 16bit int and will eventually roll over
+    // clamp it now
+    offset++;
+    offset = offset % (highLED - lowLED);  // mode the length of the section leds
+  }
+  strip.show();
 }
 
 
@@ -356,8 +350,7 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
   if (inByte & 0x1) {
     alliance = RED;
     strip.setPixelColor(alliancePixel, 255, 0, 0);
-  }
-  else {
+  } else {
     alliance = BLUE;
     strip.setPixelColor(alliancePixel, 0, 0, 255);
   }
@@ -368,31 +361,28 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
     else
       strip.setPixelColor(enabledPixel, 255, 120, 0);
     if ((currentMillis - lastMillis) > totalCycle) lastMillis = currentMillis;
-  }
-  else {
+  } else {
     strip.setPixelColor(enabledPixel, 64, 20, 0); //1/4 brightness
     enabled = 0;
   }
   if (inByte & 0x4) {
     autonomous = 1;
     strip.setPixelColor(autonomousPixel, 255, 120, 0);
-  }
-  else {
+  } else {
     autonomous = 0;
     strip.setPixelColor(autonomousPixel, 255, 0, 255);
   }
   if (inByte & 0x10) {
     watchdog = 1;
     strip.setPixelColor(watchDogPixel, 0, 255, 0);
-  }
-  else {
+  } else {
     watchdog = 0;
     strip.setPixelColor(watchDogPixel, 255, 0, 0);
   }
   strip.show();
 }
 
-void sendChamberStatus(unsigned char *statusbytes, unsigned long canID) {
+void sendChamberStatus(unsigned char* statusbytes, unsigned long canID) {
   int APIClassId = INCAN_CL_CHUTE;
   int APIIndex = 0;
   int len = 2;
@@ -406,10 +396,10 @@ void sendChamberStatus(unsigned char *statusbytes, unsigned long canID) {
 // if no changes return 0;
 //}
 
-void updateChamberStatusLEDs(unsigned char *buf) {
-  int chamber0[2] = {10, 19};
-  int chamber1[2] = {20, 29};
-  int rgb[3] = {0, 0, 0};
+void updateChamberStatusLEDs(unsigned char* buf) {
+  int chamber0[2] = { 10, 19 };
+  int chamber1[2] = { 20, 29 };
+  int rgb[3] = { 0, 0, 0 };
   switch (buf[0]) {
     case IDK:
       rgb[0] = 255; rgb[1] = 165; rgb[2] = 0;

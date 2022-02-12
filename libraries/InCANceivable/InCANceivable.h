@@ -11,11 +11,11 @@
  
  Most of the variables defined here are global and we don't make any effort to protect them from being clobbered
 */
-#ifndef AVR_LEONARDO
-const int SPI_CS_PIN = 9;
-#else
+//#ifndef AVR_LEONARDO
+//const int SPI_CS_PIN = 9;
+//#else
 const int SPI_CS_PIN = 17;
-#endif
+//#endif
 
 extern unsigned char CANflagRecv;
 extern unsigned char CANlen;

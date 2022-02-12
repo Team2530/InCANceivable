@@ -10,6 +10,8 @@ uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* er
     Wire.write((unsigned char)reg);
     if (err != NULL)
         *err |= Wire.endTransmission(false);
+    else
+        Wire.endTransmission(false);
 
     // Request 3 uchars (24 bits)
     Wire.requestFrom(addr, (unsigned char)3);
@@ -42,7 +44,7 @@ bool initColorSensor(unsigned char addr) {
         | ColorSensorMeasurementRate::Rate100ms);
 
     err |= write8BitRegister(addr, ColorSensorRegister::ProximitySensorPulses, (unsigned char)32);
-    
+
     return err;
 }
 
@@ -87,7 +89,7 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
         bool err = getChannels(channels);
         if (err) {
             states[i] = BALL_IDK;
-        } else if (getColorSensorProximity() < baseProxReadings[i] / 2) {
+        } else if (getColorSensorProximity() < 400) {// baseProxReadings[i] / 2) {
             states[i] = BALL_NONE;
         } else if (channels[0] > channels[2]) {
             states[i] = BALL_RED;
