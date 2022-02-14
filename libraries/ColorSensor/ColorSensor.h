@@ -101,6 +101,6 @@ Color getColorSensorColor(unsigned char addr = COLORSENSORV3_ADDR);
 int detectBalls(unsigned char* states, int nsensors = 2);
 bool getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
 void switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
-void calibrateBallDetection(unsigned char channel = COLORSENSORV3_ADDR);
+void calibrateBallDetection(int sensorNumber=0, unsigned char channel = COLORSENSORV3_ADDR);
 
 #endif

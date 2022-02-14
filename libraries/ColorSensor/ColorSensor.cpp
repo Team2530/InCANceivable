@@ -1,7 +1,7 @@
 #include "ColorSensor.h"
-
+#include <Arduino.h>
 // Readings from the sensors when there isnt anything inside the chute.
-uint16_t baseProxReadings[2] = { 0, 0 }; // Add more if needed
+static uint16_t baseProxReadings[8] = { 0, 0 }; // Add more if needed
 
 uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* err) {
     uint32_t data;
@@ -9,7 +9,7 @@ uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* er
     Wire.beginTransmission(addr);
     Wire.write((unsigned char)reg);
     if (err != NULL)
-        *err |= Wire.endTransmission(false);
+        *err = Wire.endTransmission(false);
     else
         Wire.endTransmission(false);
 
@@ -18,7 +18,7 @@ uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* er
     Wire.readBytes((uint8_t*)&data, 3);
 
     // Only use 20 of the 24 bits? Not sure if I get why. I also dont get why the mask is only 17 bits...
-    return data & 0x03FFFF;
+    return (data & 0x03FFFFL);
 }
 
 // Returns true on error
@@ -82,33 +82,60 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
         // Sensor has been marked as IDK, which indicates there is some sort of problem.
         // So don't read it again
         if (oldstates[i] == BALL_IDK) {
+	  //Serial.print("sensor ");
+          //Serial.print( i );
+	  //Serial.println(" is IDK");
             continue;
         }
-
         switchMux(i);
         bool err = getChannels(channels);
-        if (err) {
-            states[i] = BALL_IDK;
-        } else if (getColorSensorProximity() < 400) {// baseProxReadings[i] / 2) {
-            states[i] = BALL_NONE;
-        } else if (channels[0] > channels[2]) {
-            states[i] = BALL_RED;
-        } else {
-            states[i] = BALL_BLUE;
-        }
-        if (states[i] != oldstates[i]) ret = 1;
-        oldstates[i] = states[i];
-    }
+	if (err) {
+	  oldstates[i] = BALL_IDK;
+          ret=1;
 
+        } 
+	else{
+          uint16_t prox;
+          int16_t diff;
+          channels[0]=channels[0]*0.5/0.9; 
+	  // approximate kludge sensor is much hotter for red than blue
+	  // see APDS-9151 data sheet plots 
+	  //Serial.println(channels[1]);
+	  prox=getColorSensorProximity();
+	  diff=(prox-baseProxReadings[i]);
+          if (diff<0) 
+	    prox=0;
+	  else 
+	    prox=diff;
+	  
+	  // now measurement is relative to zero
+	  // Serial.print(baseProxReadings[i]);
+          //Serial.print(" ");
+	  //Serial.println(prox);
+	  if (prox < 50) {
+	    states[i] = BALL_NONE;          
+	  } 
+	  else {if (channels[0] > channels[2]) {
+	      states[i] = BALL_RED;
+	    } else {
+	      states[i] = BALL_BLUE;
+	    }
+	  }
+	  if (states[i] != oldstates[i]) ret = 1;
+	  oldstates[i] = states[i];
+	  }
+    }
     return(ret);
 }
 
 bool getChannels(uint32_t* rgb, unsigned char addr) {
-    bool err = false;
-    rgb[0] = read20BitRegister(addr, ColorSensorRegister::DataRed, &err);
-    rgb[1] = read20BitRegister(addr, ColorSensorRegister::DataGreen, &err);
-    rgb[2] = read20BitRegister(addr, ColorSensorRegister::DataBlue, &err);
-    return err;
+  bool err[3] = {false,false,false};
+  bool ret=false;
+    rgb[0] = read20BitRegister(addr, ColorSensorRegister::DataRed, err);
+    rgb[1] = read20BitRegister(addr, ColorSensorRegister::DataGreen, err+1);
+    rgb[2] = read20BitRegister(addr, ColorSensorRegister::DataBlue, err+2);
+    ret= (err[0] | err[1] | err[2]);
+    return ret;
 }
 
 void switchMux(unsigned char channel, unsigned char mux_addr) {
@@ -117,9 +144,12 @@ void switchMux(unsigned char channel, unsigned char mux_addr) {
     Wire.endTransmission();
 }
 
-void calibrateBallDetection(unsigned char addr) {
-    for (int i = 0; i < 2; ++i) {
-        switchMux(i);
-        baseProxReadings[i] = getColorSensorProximity();
-    }
+void calibrateBallDetection(int channel, unsigned char addr) {
+  // moved which one up calling function -- we don't want to deal with keeping track
+  // of how many sensors 
+  //for (int i = 0; i < 2; ++i) {
+        switchMux(channel);
+        baseProxReadings[channel] = getColorSensorProximity();
+	//       Serial.println(baseProxReadings[channel]);
+ //
 }

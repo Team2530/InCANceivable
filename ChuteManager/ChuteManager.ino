@@ -19,6 +19,7 @@
 const int numLEDs = 80;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
 
+#define NUM_REV_LIGHT_SENSORS 4
 
 extern MCP_CAN CAN;
 unsigned long myCanID;
@@ -34,9 +35,9 @@ unsigned char autonomous = 0;
 unsigned char watchdog = 0;
 
 unsigned char userStripProgramNumber = 2;
-unsigned char chamberStatus[2] = { 0, 0 };
+unsigned char chamberStatus[8] = {NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL};
 unsigned long canRefreshMillis = 1000L;
-// we send a message out on the canBus every 50ms or when the status changes
+// we send a message out on the canBus every 1000ms or when the status changes
 
 unsigned long lastLedRefreshMillis = 0L;
 unsigned long stripProgramRefreshMillis = 30L;
@@ -45,13 +46,16 @@ void setup() {
   // two lines to set up the CAN functionality
   myCanID = FRC_CAN_init();
   InCANceivable_setup();
-
+  Serial.begin(115200);
+  while (!Serial) {
+    ;
+  }
   // set up light strip controller
   strip.begin();
   strip.setBrightness(64);  // if you crank the brightness up you pretty much just burn battery
   // visually it's not a lot different
   for (int i = 0; i < numLEDs; i++) {
-    strip.setPixelColor(i, 0, 255, 0);
+    strip.setPixelColor(i, 255, 128, 0);
   }
   strip.show();
   // set up the I2C for sensors
@@ -61,21 +65,36 @@ void setup() {
   Wire.begin();
   Wire.setClock(3400000);
 #if defined(WIRE_HAS_TIMEOUT)
-  Wire.setWireTimeout(100000, true);
+  Serial.println("setting WireTimeout");
+  Wire.setWireTimeout(1000, true);
 #endif
 
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < NUM_REV_LIGHT_SENSORS; ++i) {
+    Serial.print("initializing sensor " );
+    Serial.println(i);
     switchMux(i);
     // initColorSensor returns true on err
     if (initColorSensor()) {
-      chamberStatus[i] = IDK;
+      chamberStatus[i] = NOBALL;
+      for (int pixel = i ; pixel < numLEDs; pixel += 8) {
+        strip.setPixelColor(pixel, 255, 0, 0);
+      }
+      delay(500);
+      strip.show();
+    }
+    else {
+      // initialization ok,  calibrate the distance
+      calibrateBallDetection(i);
+      for (int pixel = i ; pixel < numLEDs; pixel += 8) {
+        strip.setPixelColor(pixel, 0, 255, 0);
+      }
+      delay(500);
+      strip.show();
     }
   }
-  //  Serial.begin(115200);
-  //  while (!Serial) {
-  //    ;
-  //  }
-  //  Serial.println("start up done");
+  //
+ updateChamberStatusLEDs(chamberStatus, 4);
+  Serial.println("start up done");
 }
 
 void loop() {
@@ -108,7 +127,7 @@ void loop() {
     if (canRunning == 0) {
       canRunning = 1; // discard first CAN packet
     } else {
-      //      
+      //
       if (FRC_CAN_isRIO(canID)) {
         // the RIO sends a universal heartbeat
         unsigned long heartbeatID = 0x01011840;
@@ -151,19 +170,20 @@ void loop() {
   //Serial.println(millis()-currentMillis);
   // read sensors and send message to rio if chamberStatus changed
   // OR if it's been a while
-  changed = detectBalls(chamberStatus, 2);
+
+  changed = detectBalls(chamberStatus, 4);
   //Serial.println(changed);
   if (changed) {
     // tell the canbus about it and update the LED's
-    sendChamberStatus(chamberStatus, myCanID);
-    updateChamberStatusLEDs(chamberStatus);
+    sendChamberStatus(chamberStatus, 4, myCanID);
+    updateChamberStatusLEDs(chamberStatus, 4);
     lastStatusSendMillis = currentMillis;
   } else {
     // hasn't changed, if it's been a long time then re-tell the canbus
     // this may be overkill but its relatively cheap insurance in case
     // we are running long before roborio starts or is rebooting etc
     if ((currentMillis - lastStatusSendMillis) >= canRefreshMillis) {
-      sendChamberStatus(chamberStatus, myCanID);
+      sendChamberStatus(chamberStatus,4, myCanID);
       lastStatusSendMillis = currentMillis;
     }
   }
@@ -206,7 +226,7 @@ void loop() {
     // Prevent imminent death
     lastHeartbeatMillis = millis();
 
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < NUM_REV_LIGHT_SENSORS; i++) {
       switchMux(i);
       Wire.beginTransmission(COLORSENSORV3_ADDR);
       byte error = Wire.endTransmission();
@@ -309,9 +329,9 @@ void stripProgram2(unsigned long now) {
   // for fun we'll make tri colored snakes rolling around the leds
   int highLED = 70;
   int lowLED = 35;
-  int snakeRed[15] = { 0,20,60,120,255,   120,60,20,0,0,  0,0,0,0,0 };
-  int snakeGreen[15] = { 0,0,0,0,20, 60,120,255,120,60, 20,0,0,0,0 };
-  int snakeBlue[15] = { 0,0,0,0,0, 0,0,20,60,120, 255,120,60,20,0 };
+  int snakeRed[15] = { 0, 20, 60, 120, 255,   120, 60, 20, 0, 0,  0, 0, 0, 0, 0 };
+  int snakeGreen[15] = { 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0, 0, 0, 0 };
+  int snakeBlue[15] = { 0, 0, 0, 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0 };
   static unsigned long lastUpdate = 0;
   unsigned long updateTime = 75L;
   static int offset = 0;
@@ -319,7 +339,7 @@ void stripProgram2(unsigned long now) {
   if ((now - lastUpdate) > updateTime) {
     //Serial.println("prog 2");
     lastUpdate = now;
-    for (int i = 0;i < (highLED - lowLED);i++) {
+    for (int i = 0; i < (highLED - lowLED); i++) {
       int colorIndex = (i + offset) % 15; // mod the length of the snake<color> arrays
       strip.setPixelColor(i + lowLED, snakeRed[colorIndex], snakeGreen[colorIndex], snakeBlue[colorIndex]);
     }
@@ -382,12 +402,12 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
   strip.show();
 }
 
-void sendChamberStatus(unsigned char* statusbytes, unsigned long canID) {
+void sendChamberStatus(unsigned char* statusbytes, int numSensors, unsigned long canID) {
   int APIClassId = INCAN_CL_CHUTE;
   int APIIndex = 0;
-  int len = 2;
+  
   canID = FRC_CAN_embed(canID, APIClassId, APIIndex);
-  CAN.sendMsgBuf(canID, FRC_EXT, 2, statusbytes);
+  CAN.sendMsgBuf(canID, FRC_EXT, numSensors, statusbytes);
 }
 
 //int detectBalls(unsigned char *statusbytes) {
@@ -396,50 +416,35 @@ void sendChamberStatus(unsigned char* statusbytes, unsigned long canID) {
 // if no changes return 0;
 //}
 
-void updateChamberStatusLEDs(unsigned char* buf) {
-  int chamber0[2] = { 10, 19 };
-  int chamber1[2] = { 20, 29 };
+void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
+  int chamberLow[4] = { 10, 15, 20, 25};
+  int chamberHigh[4] = {15, 20, 25, 30 };
   int rgb[3] = { 0, 0, 0 };
-  switch (buf[0]) {
-    case IDK:
-      rgb[0] = 255; rgb[1] = 165; rgb[2] = 0;
-      break;
-    case RED:
-      rgb[0] = 255; rgb[1] = 0; rgb[2] = 0;
-      break;
-    case BLUE:
-      rgb[0] = 0; rgb[1] = 0; rgb[2] = 255;
-      break;
-    default:
-    case NOBALL:
-    case GREEN:
-      rgb[0] = 0; rgb[1] = 255; rgb[2] = 0;
-      break;
+  int i;
+  for (i = 0; i < numChambers; i++) {
+    switch (buf[i]) {
+      case IDK:
+        Serial.print('chamber ');
+        Serial.print(i);
+        Serial.println(' is IDK');
+        
+        rgb[0] = 255; rgb[1] = 165; rgb[2] = 0;
+        break;
+      case RED:
+        rgb[0] = 255; rgb[1] = 0; rgb[2] = 0;
+        break;
+      case BLUE:
+        rgb[0] = 0; rgb[1] = 0; rgb[2] = 255;
+        break;
+      default:
+      case NOBALL:
+      case GREEN:
+        rgb[0] = 0; rgb[1] = 255; rgb[2] = 0;
+        break;
+    }
+    for (int pixel = chamberLow[i]; pixel < chamberHigh[i]; pixel++) {
+      strip.setPixelColor(pixel, rgb[0], rgb[1], rgb[2]);
+    }
   }
-  for (int i = chamber0[0]; i < chamber0[1]; i++) {
-    strip.setPixelColor(i, rgb[0], rgb[1], rgb[2]);
-  }
-
-  switch (buf[1]) {
-    case IDK:
-      rgb[0] = 255; rgb[1] = 165; rgb[2] = 0;
-      break;
-    case RED:
-      rgb[0] = 255; rgb[1] = 0; rgb[2] = 0;
-      break;
-    case BLUE:
-      rgb[0] = 0; rgb[1] = 0; rgb[2] = 255;
-      break;
-    default:
-    case NOBALL:
-    case GREEN:
-      rgb[0] = 0; rgb[1] = 255; rgb[2] = 0;
-      break;
-
-
-  }
-  for (int i = chamber1[0]; i < chamber1[1]; i++) {
-    strip.setPixelColor(i, rgb[0], rgb[1], rgb[2]);
-  }
-  strip.show();
+strip.show();
 }
