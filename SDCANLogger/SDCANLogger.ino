@@ -31,6 +31,8 @@ void setup() {
   // InCANceivable_setup() sets up all the proper masks, filters, etc. for sending and receiving data from the RIO and other devices.
   myCanID = FRC_CAN_init();
   InCANceivable_setup();
+  CAN.init_Mask(0,FRC_EXT,0);
+  CAN.init_Mask(1,FRC_EXT,0);
 
   // Logger specific - Initializes the SD card on the Seeed shield.
   while (!SD.begin(4)) {
