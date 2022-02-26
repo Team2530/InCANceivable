@@ -4,18 +4,21 @@
 #include <FRC_CAN.h>
 //#include <MCP_CAN.h>
 #include <mcp_can.h>
-/* The InCANceivable project has three software layers to put data onto the CAN bus in an FRC compatible way.  
+/* The InCANceivable project has three software layers to put data onto the CAN bus in an FRC compatible way.
  InCANceivable is the most abstract;  it relies on functions in FRC_CAN_utils.h which in turn rely on FRC_CAN.h.
- 
- The idea here is to "do the right thing for most cases" ;  you can always use the FRC_CAN_utils and FRC_CAN 
- 
+
+ The idea here is to "do the right thing for most cases" ;  you can always use the FRC_CAN_utils and FRC_CAN
+
  Most of the variables defined here are global and we don't make any effort to protect them from being clobbered
 */
-//#ifndef AVR_LEONARDO
-//const int SPI_CS_PIN = 9;
-//#else
+
+// Uno uses a shield with a different chip select pin, 17.
+// the CANBed (Leonardo) uses 9.
+#ifndef ARDUINO_AVR_UNO
 const int SPI_CS_PIN = 17;
-//#endif
+#else
+const int SPI_CS_PIN = 9;
+#endif
 
 extern unsigned char CANflagRecv;
 extern unsigned char CANlen;
@@ -31,8 +34,8 @@ void MCP2515_ISR();
 
 void InCANceivable_setup();
 void CANConfigureMasks();
-void InCANceivable_msg_dump(unsigned long canId,int len, unsigned char *buf);
-char messageCheck(unsigned long int *canId); // returns true if there is a message
+void InCANceivable_msg_dump(unsigned long canId, int len, unsigned char* buf);
+char messageCheck(unsigned long int* canId); // returns true if there is a message
 // canId, as well as CANlen and CANbuf will have been updated 
 // messageCheck will consume broadcast messages calling FRC_CAN_handleBroadcast() for those 
 // the intent is that if(messageCheck) then the caller has a message to process  

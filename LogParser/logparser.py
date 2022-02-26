@@ -1,7 +1,7 @@
-from ast import parse
-import csv
-
 # Device and manufacturer codes of 1 is RIO
+from pprint import pprint
+
+
 RIO_MASK = (1 << 24) | (1 << 16)
 
 lines = [[int(i) for i in line.split(',')]
@@ -35,14 +35,38 @@ def parseCANID(canid):
 def isRIO(canid):
     return (canid & RIO_MASK) == RIO_MASK
 
+# RIO ID
+# print(parseCANID(0x1011840), "\n")
 
-print(parseCANID(0x1011840), "\n")
+# (Device type, Manufacturer, Device num)
+#
+# (0, 4, 63),   Broadcast message?
+# (1, 1, 0),    RIO (NI)
+# (1, 4, 8),    "Robot Controller" (CTRE)
+# (2, 4, 1),    Drive motor FL (TalonFX)
+# (2, 4, 2),    Drive motor FR (TalonFX)
+# (2, 4, 3),    Drive motor BL (TalonFX)
+# (2, 4, 4),    Drive motor BR (TalonFX)
+# (2, 4, 5),    *Ghost CTRE Motor*
+# (2, 4, 7),    *Ghost CTRE Motor*
+# (2, 4, 8),    *Ghost CTRE Motor*
+# (2, 4, 10),   Lower intake (TalonFX)
+# (2, 4, 20),   Climber right (TalonSRX)
+# (8, 4, 0),    PDP (CTRE)
+# (8, 4, 6),    Other "power distribution module" (VRM<->PDP?)
+# (10, 8, 3)    InCANceivable
 
+
+devices = set()
 
 for i in range(len(lines)):
     p = parseCANID(lines[i][1])
     datalen = lines[i][2]
-    data = lines[i][3:(3+datalen)]
+    data = lines[i][3:]
+
+    # Device type, manufacturer, and num
+    dvc = (p[0], p[1], p[4])
+    devices.add(dvc)
 
     if isRIO(lines[i][1]) and datalen == 8:
         # print(data[0:datalen])
@@ -54,9 +78,15 @@ for i in range(len(lines)):
             "enabled": bool(data[4] & 16),  # "WatchdogEnabled"
             "reserved": (data[4] >> 5) & 0x7,
         }
-        print("Heartbeat")
+        print("--- Heartbeat ---")
         print("Enabled:", heartbeat["enabled"], "\n")
     elif p[0] == 10 and p[1] == 8:
-        print("InCANceivable!")
+        print("--- InCANceivable ---")
         print("Ball states:", [
-            ["IDK", "Red", "Green", "Blue", "None"][ball] for ball in data])
+            ["IDK", "Red", "Green", "Blue", "None"][ball] for ball in data[:4]], "\n")
+    elif p[0] == 0:  # Broadcast message
+        print("--- Broadcast ---")
+        print(data)
+        print()
+
+pprint(devices)
