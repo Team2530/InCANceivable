@@ -20,7 +20,7 @@ const char filename[30] = "canlog_0.csv";
 void setup() {
   // Start a serial connection for local debugging
   // make sure to remove all `Serial` stuff when not connecting to the board over USB
-  // Serial.begin(115200);
+  Serial.begin(115200);
 
   // Specific to the Seeed CAN shield - A pin is used to send a "interrupt" (very low-level message) to the board via a specific pin.
   // In the case of the Seeed CAN shield, this pin is 2
@@ -40,7 +40,7 @@ void setup() {
   while (!SD.begin(4)) { // 4 is the SPI chip select for the SD card
     delay(1000);
     //Serial.println("SD not working...");
-  } //Serial.println("SD init OK.");
+  } Serial.println("SD init OK.");
 
   // Make sure to create a new logfile.
   for (int logn = 0; SD.exists(filename); ++logn) {

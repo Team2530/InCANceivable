@@ -12,12 +12,12 @@
  Most of the variables defined here are global and we don't make any effort to protect them from being clobbered
 */
 
-// Uno uses a shield with a different chip select pin, 17.
-// the CANBed (Leonardo) uses 9.
-#ifndef ARDUINO_AVR_UNO
-const int SPI_CS_PIN = 17;
-#else
+// Uno uses a shield with a different chip select pin, 9.
+// the CANBed (Leonardo) uses 17.
+#ifdef ARDUINO_AVR_UNO
 const int SPI_CS_PIN = 9;
+#else
+const int SPI_CS_PIN = 17;
 #endif
 
 extern unsigned char CANflagRecv;
