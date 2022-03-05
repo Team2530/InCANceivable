@@ -1,10 +1,10 @@
-#  python .\imgconv.py .\frames\grad1.png -f dec -Z -l col -o ..\libraries\images\grad1.h -A
+#! /bin/env python3
+# python .\imgconv.py .\data\1.png -o ..\libraries\images\img.h -A -Z -l col
+# python .\imgconv.py ..\..\matrix\data\marquee2.png -o ..\images\marquee.h -f string -A
 
-from glob import glob
 from PIL import Image
 import sys, os
 import imghdr
-import re
 
 args = sys.argv[1:]
 valid_formats = [
@@ -51,7 +51,7 @@ zigzag = ("-Z" in args)
 
 # Output settings
 suffix = "PROGMEM " if arduino else ""
-prefix = "static const"
+prefix = "static const "
 
 name = args[0].split("\\")[-1].split(".")[0]
 outfile = name + ".h"
@@ -111,7 +111,7 @@ for imagename in imagenames:
             case "decimal" | "dec" | "d":
                 return "".join([f"{str(c)}, " for c in pix])
             case "string" | "str" | "s":
-                return "".join([chr(c) for c in pix])
+                return "".join([f"\\{hex(c)[1:]}" for c in pix])
 
     if (layout in ["row", "r"]):
         for y in range(image.height):
@@ -126,11 +126,15 @@ for imagename in imagenames:
         
     out.append(encoded)
    
-output_text = "#pragma once\n#include <avr/pgmspace.h>\n\n" 
-output_text += f"const unsigned int {name}_width = {width}, {name}_height = {height}, {name}_depth = {depth};\n\n"
+output_text = f"/*\n\tMade with ImgConv v1.1\n\tlayout: {layout}-major\n\tformat: {format}\n\tzigzag: {zigzag}\n*/\n\n"
+output_text += "#pragma once\n#include <avr/pgmspace.h>\n\n" 
+output_text += f"const unsigned int {name}_width = {width}, {name}_height = {height}, {name}_depth = {depth};\n"
+output_text += f"#define {name.upper()}_ZIGZAG {1 if zigzag else 0}\n#define {name.upper()}_COLMAJOR {1 if layout in ['column', 'col', 'c'] else 0}\n\n"
 
 if (len(out) == 1):
-    output_text += f"{prefix} unsigned char {name}[{width*height*depth}] {suffix}" + "= {\n\t" + out[0] + "\n};"
+    output_text += f"{prefix}unsigned char {name}[{width*height*depth}] {suffix}"
+    if format[0] == 's': output_text += f"= \"{out[0]}\";" 
+    else: output_text +="= {\n\t" + out[0] + "\n};"
 else:
     output_text += f"unsigned int {name}_numframes = {len(imagenames)};\n\n"
     output_text += f"const char* {name}_names[] = " + "{\n"
@@ -139,9 +143,9 @@ else:
         output_text += f"\t\"{i}\",\n"
     output_text += "};\n\n"
     
-    output_text += f"{prefix} unsigned char {name}[][{width*height*depth}] {suffix}" + "= {"
+    output_text += f"{prefix}unsigned char {name}[][{width*height*depth}] {suffix}" + "= {"
     for o in out:
-        output_text += "\n\t{\n\t\t" + o + "\n\t},"
+        output_text += f"\n\t\"{o}\"," if format[0] == 's' else "\n\t{\n\t\t" + o + "\n\t},"
     output_text += "\n};"
         
 with open(outfile, "w") as f:
