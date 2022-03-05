@@ -15,12 +15,12 @@ extern MCP_CAN CAN;
 unsigned long myCanID; // Will later be set during initialization
 
 File logFile; // File pointer to SD card
-const char filename[30] = "canlog_0.csv";
+static char filename[30] = "canlog_0.csv";
 
 void setup() {
   // Start a serial connection for local debugging
   // make sure to remove all `Serial` stuff when not connecting to the board over USB
-  Serial.begin(115200);
+  //Serial.begin(115200);
 
   // Specific to the Seeed CAN shield - A pin is used to send a "interrupt" (very low-level message) to the board via a specific pin.
   // In the case of the Seeed CAN shield, this pin is 2
@@ -35,17 +35,22 @@ void setup() {
   CAN.init_Mask(1,FRC_EXT,0);
   CAN.init_Filt(0,FRC_EXT,0);
   CAN.init_Filt(1,FRC_EXT,0);
+  CAN.init_Filt(2,FRC_EXT,0);
 
   // Logger specific - Initializes the SD card on the Seeed shield.
   while (!SD.begin(4)) { // 4 is the SPI chip select for the SD card
     delay(1000);
-    //Serial.println("SD not working...");
-  } Serial.println("SD init OK.");
+     //Serial.println("SD not working...");
+  }  //Serial.println("SD init OK.");
 
   // Make sure to create a new logfile.
   for (int logn = 0; SD.exists(filename); ++logn) {
-    snprintf((char*)filename, 30, "canlog_%d.csv", logn);
+    sprintf(filename, "canlog_%d.csv", logn);
   }
+
+  logFile = SD.open(filename, FILE_WRITE);
+  logFile.println("0,0,0,0,0,0,0,0,0,0,0,0");
+  logFile.close();
 }
 
 void loop() {
