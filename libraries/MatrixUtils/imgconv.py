@@ -45,8 +45,17 @@ inp = args[0]
 is_directory = os.path.isdir(inp)
 
 format = "hex"
+# Whether the data is stored in row or column-major order, important if directly writing to strips
 layout = "col"
+
+# Arduino mode, adds the PROGMEM qualifier to the data array(s).
 arduino = ("-A" in args)
+
+# Zigzag mode, causes every other major "slice" to be reversed, for matrices formed of a zigzag of LEDs:
+# →→→→→→→→↓
+# ↓←←←←←←←←
+# →→→→→→→→↓
+# ←←←←←←←←←
 zigzag = ("-Z" in args)
 
 # Output settings
@@ -80,6 +89,7 @@ if ('-l' in args):
     layout = args[li + 1].lower()
     
 out = []
+# Find and sort images, if a directory is passed
 imagenames = list([f"{inp}/{img}" for img in os.listdir(inp) if imghdr.what(f"{inp}/{img}") != None]) if is_directory else [inp]
 imagenames = sorted(imagenames, key=lambda name: not name[0].isdigit() or int(name.split('.')[0]))
 
@@ -87,6 +97,8 @@ width = -1
 height = -1
 depth = -1
 
+# Put all images into output format, even if there is only one. 
+# will handle writing to file/C-specific formatting later
 for imagename in imagenames:
     encoded = ""
     
@@ -94,17 +106,20 @@ for imagename in imagenames:
     if height == -1: 
         height = image.height
         width = image.width
+    # All frames must be identically sized.
     assert height == image.height and width == image.width
         
-    
+    # Helper for DRYer code
     def outpixel(x, y):
         pix = image.getpixel((x, y))
+        # Grayscale images won't be a tuple according to pillow docs, so convert it for consistency
         pix = list(pix) if isinstance(pix, tuple) else [pix]
         
         global depth
         if depth == -1: depth = len(pix)
         assert depth == len(pix) # Ensure consistently channel-d images
         
+        # Output the pixel depending on output format
         match format:
             case "hex" | "h":
                 return "".join([f"{hex(c)}, " for c in pix])
@@ -113,6 +128,7 @@ for imagename in imagenames:
             case "string" | "str" | "s":
                 return "".join([f"\\{hex(c)[1:]}" for c in pix])
 
+    # Row and column major options, x first or y first.
     if (layout in ["row", "r"]):
         for y in range(image.height):
             for x in range(image.width):
@@ -125,17 +141,26 @@ for imagename in imagenames:
                 encoded += outpixel(x, y)
         
     out.append(encoded)
-   
+
+# ImgConv header
 output_text = f"/*\n\tMade with ImgConv v1.1\n\tlayout: {layout}-major\n\tformat: {format}\n\tzigzag: {zigzag}\n*/\n\n"
-output_text += "#pragma once\n#include <avr/pgmspace.h>\n\n" 
+# Include guard-ish and possibly arduino progmem include
+output_text += f"#pragma once\n{'#include <avr/pgmspace.h>' if arduino else ''}\n\n"
+# Dimensions
 output_text += f"const unsigned int {name}_width = {width}, {name}_height = {height}, {name}_depth = {depth};\n"
+# Parameter defines
 output_text += f"#define {name.upper()}_ZIGZAG {1 if zigzag else 0}\n#define {name.upper()}_COLMAJOR {1 if layout in ['column', 'col', 'c'] else 0}\n\n"
 
+# Single or multiple frames
 if (len(out) == 1):
-    output_text += f"{prefix}unsigned char {name}[{width*height*depth}] {suffix}"
+    # Output array
+    # NOTE: String output requires 1 byte more for null terminator.
+    output_text += f"{prefix}unsigned char {name}[{width*height*depth + (1 if format[0] == 's' else 0)}] {suffix}"
+    # Strings are special
     if format[0] == 's': output_text += f"= \"{out[0]}\";" 
     else: output_text +="= {\n\t" + out[0] + "\n};"
 else:
+    # Number of frames and frame filenames, for multiple frame collections
     output_text += f"unsigned int {name}_numframes = {len(imagenames)};\n\n"
     output_text += f"const char* {name}_names[] = " + "{\n"
     for imagename in imagenames:
@@ -143,10 +168,12 @@ else:
         output_text += f"\t\"{i}\",\n"
     output_text += "};\n\n"
     
-    output_text += f"{prefix}unsigned char {name}[][{width*height*depth}] {suffix}" + "= {"
+    # Output frames as an array-of-arrays, one 1D array per frame.
+    output_text += f"{prefix}unsigned char {name}[][{width*height*depth + (1 if format[0] == 's' else 0)}] {suffix}" + "= {"
     for o in out:
         output_text += f"\n\t\"{o}\"," if format[0] == 's' else "\n\t{\n\t\t" + o + "\n\t},"
     output_text += "\n};"
-        
+
+# Finally, write data to output
 with open(outfile, "w") as f:
     f.write(output_text)
