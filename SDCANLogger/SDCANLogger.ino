@@ -15,7 +15,7 @@ extern MCP_CAN CAN;
 unsigned long myCanID; // Will later be set during initialization
 
 File logFile; // File pointer to SD card
-const char filename[30] = "canlog_0.csv";
+static char filename[30] = "canlog_0.csv";
 
 void setup() {
   // Start a serial connection for local debugging
@@ -30,17 +30,27 @@ void setup() {
   // FRC_CAN_init() Initializes the CAN chip and generates the device's ID, which later can be used to check if messages are specifically meant for this device.
   // InCANceivable_setup() sets up all the proper masks, filters, etc. for sending and receiving data from the RIO and other devices.
   myCanID = FRC_CAN_init();
-  InCANceivable_setup();
+  //InCANceivable_setup(); 
+  CAN.init_Mask(0,FRC_EXT,0);
+  CAN.init_Mask(1,FRC_EXT,0);
+  CAN.init_Filt(0,FRC_EXT,0);
+  CAN.init_Filt(1,FRC_EXT,0);
+  CAN.init_Filt(2,FRC_EXT,0);
 
   // Logger specific - Initializes the SD card on the Seeed shield.
-  while (!SD.begin(4)) {
+  while (!SD.begin(4)) { // 4 is the SPI chip select for the SD card
     delay(1000);
-  } // Serial.println("SD init OK.");
+     //Serial.println("SD not working...");
+  }  //Serial.println("SD init OK.");
 
   // Make sure to create a new logfile.
   for (int logn = 0; SD.exists(filename); ++logn) {
-    snprintf((char*)filename, 30, "canlog_%d.csv", logn);
+    sprintf(filename, "canlog_%d.csv", logn);
   }
+
+  logFile = SD.open(filename, FILE_WRITE);
+  logFile.println("0,0,0,0,0,0,0,0,0,0,0,0");
+  logFile.close();
 }
 
 void loop() {
