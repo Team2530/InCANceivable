@@ -2,7 +2,7 @@
 #define COLORSENSOR_H
 
 #include <Wire.h>
-
+#include <SparkFun_VCNL4040_Arduino_Library.h>
 #define BALL_IDK 0
 #define BALL_RED 1
 #define BALL_GREEN 2
@@ -10,6 +10,7 @@
 #define BALL_NONE 4
 
 extern uint16_t baseProxReadings[];
+
 
 typedef struct Color {
     float r, g, b;
@@ -99,8 +100,9 @@ bool initColorSensor(unsigned char addr = COLORSENSORV3_ADDR);
 uint16_t getColorSensorProximity(unsigned char addr = COLORSENSORV3_ADDR);
 Color getColorSensorColor(unsigned char addr = COLORSENSORV3_ADDR);
 int detectBalls(unsigned char* states, int nsensors = 2);
+int detectBalls_prox(unsigned char* states, int nsensors = 2, void** proxSensors=NULL);
 bool getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
-void switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
+int switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
 void calibrateBallDetection(int sensorNumber=0, unsigned char channel = COLORSENSORV3_ADDR);
 
 #endif

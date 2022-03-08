@@ -7,6 +7,7 @@
 #include <FRC_CAN.h>
 #include <FRC_CAN_utils.h>
 #include <ColorSensor.h>
+#include <SparkFun_VCNL4040_Arduino_Library.h>
 #include <Wire.h>
 
 #define IDK 0
@@ -20,6 +21,7 @@ const int numLEDs = 80;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
 
 #define NUM_REV_LIGHT_SENSORS 4
+VCNL4040* proxSensors[4];  // we will use the convention that if proxSensors[i]==NULL, we don't use it
 
 extern MCP_CAN CAN;
 unsigned long myCanID;
@@ -46,10 +48,10 @@ void setup() {
   // two lines to set up the CAN functionality
   myCanID = FRC_CAN_init();
   InCANceivable_setup();
-  // Serial.begin(115200);
-  //  while (!Serial) {
-  //    ;
-  //  }
+ // Serial.begin(115200);
+ //while (!Serial) {
+ //   ;
+ // }
   // set up light strip controller
   strip.begin();
   strip.setBrightness(64);  // if you crank the brightness up you pretty much just burn battery
@@ -65,13 +67,13 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
 #if defined(WIRE_HAS_TIMEOUT)
-  //  Serial.println("setting WireTimeout");
+ // Serial.println("setting WireTimeout");
   Wire.setWireTimeout(1000, true);
 #endif
 
   for (int i = 0; i < NUM_REV_LIGHT_SENSORS; ++i) {
-    //    Serial.print("initializing sensor " );
-    //    Serial.println(i);
+  //  Serial.print("initializing sensor " );
+   // Serial.println(i);
     switchMux(i);
     // initColorSensor returns true on err
     if (initColorSensor()) {
@@ -91,6 +93,52 @@ void setup() {
       delay(500);
       strip.show();
     }
+  }
+  //Serial.println("trying to initialize proximity sensors");
+  for (int i = 0; i < 4; i++) {
+    proxSensors[i] = NULL;
+  }
+  VCNL4040 sensor0;
+  VCNL4040 sensor1;
+  proxSensors[0] = &sensor0;
+  proxSensors[1] = &sensor1;
+  proxSensors[2]=NULL;
+  proxSensors[3]=NULL;
+  for (int i = 0; i < 2; i++) {
+    unsigned long currentMillis;
+    VCNL4040 *sensor=NULL;
+    switchMux(i + 4); // proximity is on ports 4,5
+    delay(10);
+    currentMillis = millis();
+    sensor = proxSensors[i];
+    if (sensor) {
+      sensor->begin(Wire); // n.b. you have to pass Wire or the
+      // VCNL4040 library will start it's own and then things
+      // get really messy
+      if (sensor->isConnected()) {
+        sensor->powerOnProximity();
+        sensor->powerOffAmbient();
+        sensor->disableWhiteChannel();
+        //Serial.print("checking sensor number ");
+        //Serial.print(i);
+        //Serial.print(" value: ");
+        //Serial.println(sensor->getProximity());
+        //Serial.println(sensor->getProximity());
+        //Serial.println(sensor->getProximity());
+      }
+      else {
+      //  Serial.print("failed to get to connect sensor ");
+      //  Serial.print(i);
+     //   Serial.println(" disabling");
+        for (int pixel = i ; pixel < numLEDs; pixel += 8) {
+          strip.setPixelColor(pixel, 255, 186, 0);
+        }
+        proxSensors[i] = NULL;
+        strip.show();
+        delay(2000);
+      }
+    }
+    Serial.println((long) sensor, HEX);
   }
   //
   updateChamberStatusLEDs(chamberStatus, 4);
@@ -170,8 +218,8 @@ void loop() {
   //Serial.println(millis()-currentMillis);
   // read sensors and send message to rio if chamberStatus changed
   // OR if it's been a while
-
-  changed = detectBalls(chamberStatus, 4);
+  //Serial.println("calling detectBalls_prox");
+  changed = detectBalls_prox(chamberStatus, 4, proxSensors);
   //Serial.println(changed);
   if (changed) {
     // tell the canbus about it and update the LED's

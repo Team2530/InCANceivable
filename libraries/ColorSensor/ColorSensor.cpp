@@ -53,10 +53,10 @@ uint16_t getColorSensorProximity(unsigned char addr) {
 
     Wire.beginTransmission(addr);
     Wire.write(ColorSensorRegister::ProximityData);
-    Wire.endTransmission(false);
+    Wire.endTransmission();
     Wire.requestFrom(addr, (unsigned char)2);
     Wire.readBytes((uint8_t*)&d, 2);
-
+    //Wire.endTransmission();
     return d & 0x7FF; // Mask to 11 bits
 }
 
@@ -74,6 +74,7 @@ Color getColorSensorColor(unsigned char addr) {
     return c;
 }
 
+//  
 int detectBalls(unsigned char* oldstates, int nsensors) {
     uint32_t channels[3];
     unsigned char states[8];
@@ -87,7 +88,11 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
 	  //Serial.println(" is IDK");
             continue;
         }
-        switchMux(i);
+	if (switchMux(i)){
+          delayMicroseconds(100);
+	  // oops maybe a problem switching the mux?  try one more time
+	  switchMux(i);
+	}
         bool err = getChannels(channels);
 	if (err) {
 	  oldstates[i] = BALL_IDK;
@@ -109,10 +114,12 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
 	    prox=diff;
 	  
 	  // now measurement is relative to zero
-	  // Serial.print(baseProxReadings[i]);
-          //Serial.print(" ");
-	  //Serial.println(prox);
-	  if (prox < 50) {
+          if (prox>5000){
+	    Serial.print(baseProxReadings[i]);
+	    Serial.print(" ");
+	    Serial.println(prox);
+	  }
+	  if (prox < 5000) {
 	    states[i] = BALL_NONE;          
 	  } 
 	  else {if (channels[0] > channels[2]) {
@@ -128,6 +135,140 @@ int detectBalls(unsigned char* oldstates, int nsensors) {
     return(ret);
 }
 
+int detectBalls_prox(unsigned char* oldstates, int nsensors, void **proxPointers) {
+  // warning this is not optimally organized  
+    uint32_t channels[3];
+    unsigned char states[8];
+    VCNL4040* proximitySensor;
+    unsigned int proxThreshold=40; 
+    int ret = 0;
+    for (int i = nsensors-1; i >= 0; i--) {
+      int proxBallPresent=-1;
+      //Serial.print(" processing prox sensor " );
+      //Serial.print(i);
+      //Serial.print(" ");
+        // Sensor has been marked as IDK, which indicates there is some sort of problem.
+        // So don't read it again
+      if (oldstates[i] == BALL_IDK) {
+	//  Serial.print("sensor ");
+	// Serial.print( i );
+	// Serial.println(" is IDK");
+            continue;
+        }
+        if (proxPointers[i]){
+	  int proxChannel=i+4;
+	  unsigned int proxValue=0;
+	  if (switchMux(proxChannel)){
+	    //  Serial.println("mux switch problems");
+	    delayMicroseconds(100);
+	    switchMux(proxChannel);
+	  }
+          //delay(10);
+	  //	  Serial.println((long)proxPointers[i],HEX);
+	  //proximitySensor=(VCNL4040*) proxPointers[i];
+	  proximitySensor=proxPointers[i];
+	  proximitySensor->begin(Wire); // 20220228  Don't understand why we have to begin the proximitySensor 
+	  //Serial.print("polling sensor ");
+	  //Serial.print(i);
+	  //Serial.print(" address is ");
+	  //Serial.print( (long) proximitySensor, HEX);          
+          //Serial.print( " is connected ");
+	  //Serial.println(proximitySensor->isConnected());
+          //proximitySensor->powerOnProximity();
+          //Serial.println(" powered proximity on -- now read");
+	  proxValue = proximitySensor->getProximity();
+          //Serial.print(" prox value ");Serial.println(proxValue);
+          if (proxValue>proxThreshold){
+            proxBallPresent=1;
+	    // Serial.println("prox ball present");
+	  }
+	  else {
+	    //   Serial.println("prox ball absent");
+	    proxBallPresent=0;
+	  }
+	}
+        else {
+	  proxBallPresent=-1;
+	}
+	// now if proxBallPresent ==  0 there is a proximity sensor on this channel and no ball
+	//  if 1 then a ball is present
+        //  if -1 there is a NO  proximity sensor for this channel
+        //  or  
+        if (proxBallPresent==0){  // then we don't even need to turn on the color sensor mux
+	  if (oldstates[i] == BALL_IDK){  // at some point in the past the color sensor borked -- skip it. 
+	    // we could have been smarter and not even read the prox sensor 
+	    // it's unlikely to have a decommissioned color sensor so not fixing (JG 20220226)      
+            states[i]=BALL_IDK;  
+	    continue;
+	  }
+          else{
+	    states[i]= BALL_NONE;
+	  }
+	} 
+	else{
+	  //          Serial.println("connecting color sensor");
+	  // we either don't have a proximity sensor or we need to read the color sensors -- wire up the mux
+	  if (switchMux(i)){
+	    delayMicroseconds(100);
+	    // oops maybe a problem switching the mux?  try one more time
+	    switchMux(i);
+	  }
+          delayMicroseconds(100);
+	  if (proxBallPresent==-1){
+	    // get the proximity reading from the color sensor
+	    uint16_t colorProx;
+	    uint16_t diff;
+	    colorProx=getColorSensorProximity();
+	    // diff=(colorProx-baseProxReadings[i]);
+            diff=colorProx;
+	    if (diff<0) 
+	      colorProx=0;
+	    else 
+	      colorProx=diff;
+	    // now measurement is relative to zero
+            
+	    //	    Serial.print(baseProxReadings[i]);
+	    //Serial.print(" ");
+	    //Serial.println(colorProx);
+	    if (colorProx < 100) {
+	      states[i] = BALL_NONE;          
+	    } 
+            else{
+	      proxBallPresent=1;
+	    }
+	  } 
+	  if (proxBallPresent==1) {
+	    // ball is present by some proximity sensor somehow
+	    bool err = getChannels(channels);
+	    if (err) {
+	      oldstates[i] = BALL_IDK;
+	      ret=1;
+	    } 
+	    else{
+	      channels[0]=channels[0]*0.7/0.9; 
+	      // approximate kludge sensor is much hotter for red than blue
+	      // see APDS-9151 data sheet plots 
+	      //Serial.println(channels[1]);
+	      if (channels[0] > channels[2]) {
+		states[i] = BALL_RED;
+	      }
+	      else {
+		states[i] = BALL_BLUE;
+	      }
+	    }
+	  
+	  }
+	}
+	// did this sensor change?
+	if (states[i] != oldstates[i]){
+	  ret = 1;
+	}
+	oldstates[i] = states[i];   
+    }
+    return(ret);
+}
+
+
 bool getChannels(uint32_t* rgb, unsigned char addr) {
   bool err[3] = {false,false,false};
   bool ret=false;
@@ -138,10 +279,13 @@ bool getChannels(uint32_t* rgb, unsigned char addr) {
     return ret;
 }
 
-void switchMux(unsigned char channel, unsigned char mux_addr) {
-    Wire.beginTransmission(mux_addr);
-    Wire.write(1 << channel);
-    Wire.endTransmission();
+int switchMux(unsigned char channel, unsigned char mux_addr) {
+  int ret;
+  Wire.beginTransmission(mux_addr);
+  Wire.write(1 << channel);
+  // should check that the endTransmission() returned no errorts
+  ret=Wire.endTransmission();
+  return ret;
 }
 
 void calibrateBallDetection(int channel, unsigned char addr) {
@@ -149,7 +293,9 @@ void calibrateBallDetection(int channel, unsigned char addr) {
   // of how many sensors 
   //for (int i = 0; i < 2; ++i) {
         switchMux(channel);
+        delay(50);
         baseProxReadings[channel] = getColorSensorProximity();
+        //Serial.println(baseProxReadings[channel]);
 	//       Serial.println(baseProxReadings[channel]);
  //
 }
