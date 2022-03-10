@@ -375,8 +375,8 @@ void stripProgram1(unsigned long now) {
 
 void stripProgram2(unsigned long now) {
   // for fun we'll make tri colored snakes rolling around the leds
-  int highLED = 70;
-  int lowLED = 35;
+  int highLED = 72;
+  int lowLED = 64;
   int snakeRed[15] = { 0, 20, 60, 120, 255,   120, 60, 20, 0, 0,  0, 0, 0, 0, 0 };
   int snakeGreen[15] = { 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0, 0, 0, 0 };
   int snakeBlue[15] = { 0, 0, 0, 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0 };
@@ -467,10 +467,14 @@ void sendChamberStatus(unsigned char* statusbytes, int numSensors, unsigned long
 //}
 
 void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
-  int chamberLow[4] = { 7, 9, 11, 13};
-  int chamberHigh[4] = {9, 11, 13, 15 };
+  int chamberLow[4] = { 0, 2, 4, 6};
+  int chamberHigh[4] = {2, 4, 6, 8 };
+  int xMin=1;
+  int xMax=8;
+  int xStride=8;
   int rgb[3] = { 0, 0, 0 };
   int i;
+  int  j;
   for (i = 0; i < numChambers; i++) {
     switch (buf[i]) {
       case IDK:
@@ -493,7 +497,11 @@ void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
         break;
     }
     for (int pixel = chamberLow[i]; pixel < chamberHigh[i]; pixel++) {
-      strip.setPixelColor(pixel, rgb[0], rgb[1], rgb[2]);
+      for(j=xMin;j<xMax;j++){
+         int ledNum;
+         ledNum=pixel+j*xStride;
+         strip.setPixelColor(ledNum, rgb[0], rgb[1], rgb[2]);
+      }
     }
   }
   strip.show();
