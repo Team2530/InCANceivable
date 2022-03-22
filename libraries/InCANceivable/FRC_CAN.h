@@ -5,17 +5,17 @@ FRC_CAN.h
 
 This is a landing spot for Defines that should be good to let a Seeed Studio CANBed board play nicely
 on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place and will pull in the
-.h files from there so we can use symbols defined there in our definitions. 
+.h files from there so we can use symbols defined there in our definitions.
 
-*/ 
+*/
 
 #include <mcp_can_dfs.h>
 
-/* First off, we define a bunch of symbols that make it more transparent when we build up FRC specific 
+/* First off, we define a bunch of symbols that make it more transparent when we build up FRC specific
    "arbitration ID's"  */
 
 #define FRC_EXT  1  
-// always extended 29 bit addresses for FRC 
+   // always extended 29 bit addresses for FRC 
 
 #define FRC_CAN_SPEED CAN_1000KBPS  
 // always run at 1MBS;  this is inherited from the mcp_can_dfs.h  
@@ -37,7 +37,7 @@ on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place 
 #define FRC_DEVNUM_MASK 0x3fL
 // this allows constructs like  Manuf=(ARB>>FRC_MANUFACT_SHIFT) & FRC_MANUFACT_MASK to extract fields. 
 
-/* Now we define some things that are specific to our software stack */ 
+/* Now we define some things that are specific to our software stack */
 
 #define INCAN_DEVICE_TYPE 10L
 // miscellaneous device
@@ -64,7 +64,7 @@ on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place 
 // saves some bits on the wire. We previously defined symbols that help with the bit packing and unpacking 
 // Below are the API class and index definitions for specific to this package. 
 // This becomes quite arbitrary and is an artifact of the team hardware specific implementation. 
- 
+
 // API CLASSES  (6 bits) 
 #define INCAN_CL_CFG 1L  // we could use zero but avoid it as an extra layer of defense 
 // against stepping on broadcast messages with class num zero

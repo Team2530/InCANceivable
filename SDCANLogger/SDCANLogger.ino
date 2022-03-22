@@ -12,44 +12,43 @@ const int CAN_INT_PIN = 2;
 
 // CAN is a global in the InCANceivable library (InCANceivable.cpp), so we mark it `extern`.
 extern MCP_CAN CAN;
-unsigned long myCanID; // Will later be set during initialization
 
 File logFile; // File pointer to SD card
-static char filename[30] = "canlog_0.csv";
+static char filename[30] = "log_0.csv";
 
 void setup() {
   // Start a serial connection for local debugging
   // make sure to remove all `Serial` stuff when not connecting to the board over USB
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   // Specific to the Seeed CAN shield - A pin is used to send a "interrupt" (very low-level message) to the board via a specific pin.
   // In the case of the Seeed CAN shield, this pin is 2
   // attachInterrupt registers a callback to be fired when a interrupt happens.
   attachInterrupt(digitalPinToInterrupt(CAN_INT_PIN), MCP2515_ISR, FALLING);
 
-  // FRC_CAN_init() Initializes the CAN chip and generates the device's ID, which later can be used to check if messages are specifically meant for this device.
-  // InCANceivable_setup() sets up all the proper masks, filters, etc. for sending and receiving data from the RIO and other devices.
-  myCanID = FRC_CAN_init();
-  //InCANceivable_setup(); 
+  // Initialize the CAN chip
+  while (CAN_OK != CAN.begin(FRC_CAN_SPEED)) delay(100);
+
+  // Clear all masks.
   CAN.init_Mask(0,FRC_EXT,0);
   CAN.init_Mask(1,FRC_EXT,0);
+  // No filters either.
   CAN.init_Filt(0,FRC_EXT,0);
   CAN.init_Filt(1,FRC_EXT,0);
   CAN.init_Filt(2,FRC_EXT,0);
 
   // Logger specific - Initializes the SD card on the Seeed shield.
-  while (!SD.begin(4)) { // 4 is the SPI chip select for the SD card
-    delay(1000);
-     //Serial.println("SD not working...");
-  }  //Serial.println("SD init OK.");
+  // 4 is the SPI chip select for the SD card
+  while (!SD.begin(4)) delay(100);
 
   // Make sure to create a new logfile.
   for (int logn = 0; SD.exists(filename); ++logn) {
-    sprintf(filename, "canlog_%d.csv", logn);
+    sprintf(filename, "log_%d.csv", logn);
   }
+  Serial.println(filename);
 
   logFile = SD.open(filename, FILE_WRITE);
-  logFile.println("0,0,0,0,0,0,0,0,0,0,0,0");
+  logFile.println("timestamp_millis,can_id,data_length,data_0,data_1,data_2,data_3,data_4,data_5,data_6,data_7");
   logFile.close();
 }
 
@@ -76,29 +75,19 @@ void loop() {
       if (canRunning == 0) {
         canRunning = 1;
       } else {
-        // FRC_CAN_isMe(msgID, myID) tests if a message is "destined" for this device
-        if (FRC_CAN_isMe(canID, myCanID)) {
-          Serial.println("Message for me:");
-          
-          // FRC_CAN_extractClass gets the API class and API index (not used) from the CAN message
-          FRC_CAN_extractClass(canID, &messageAPIclass, &messageAPIindex);
-          
-          // Pretty-prints a CAN message with all kinds of useful info
-          InCANceivable_msg_dump(canID, CANlen, CANbuf);
-        } else if (FRC_CAN_isRIO(canID)) {
+        if (FRC_CAN_isRIO(canID)) {
           bool diff = false;
+          // Compare heartbeat bytes.
           for (int i = 0; i < CANlen; ++i) {
             diff |= lastHeartbeat[i] != CANbuf[i];
             lastHeartbeat[i] = CANbuf[i]; // Update last heartbeat
           }
-
           if (!diff) {
             continue; // We don't want to log repeated similar RIO heartbeats
           }
         }
 
         // -------- Logging --------
-        
         logFile.print(millis()); // Timestamp
         logFile.print(",");
         logFile.print(canID); // ID
