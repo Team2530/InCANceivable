@@ -10,8 +10,8 @@
 #define PDP_APID_StatusEnergy 0x5D
 #define PDP_APID_Control1 0x70
 
-#define PDP_DEVTYPE 8 // "Power Distribution Module"
-#define PDP_MFG 4 // CTRE
+#define PDP_DEVTYPE 8L // "Power Distribution Module"
+#define PDP_MFG 4L // CTRE
 
 #define PDP_MASK (PDP_DEVTYPE << FRC_DEVICE_SHIFT) | (PDP_MFG << FRC_MANUFACT_SHIFT)
 

@@ -27,8 +27,8 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_K
 #define MAX_STRIP_BRIGHTNESS 64
 #define NUM_REV_LIGHT_SENSORS 4
 
-  VCNL4040 sensor0;
-  VCNL4040 sensor1;
+VCNL4040 sensor0;
+VCNL4040 sensor1;
 //  proxSensors[0] = &sensor0;
 //  proxSensors[1] = &sensor1;
 //  proxSensors[2] = NULL;
@@ -58,12 +58,15 @@ unsigned long lastLedRefreshMillis = 0L;
 unsigned long stripProgramRefreshMillis = 30L;
 int stripBrightness = 64;
 
+#define NUM_INDICATORS 2
+RGB indicators[NUM_INDICATORS];
+
 void setup() {
 
-  Serial.begin(115200);
-  while (!Serial) {
-    ;
-  }
+//  Serial.begin(115200);
+//  while (!Serial) {
+//    ;
+//  }
 
   // two lines to set up
   myCanID = FRC_CAN_init();
@@ -178,6 +181,13 @@ void setup() {
   }
   //
   updateChamberStatusLEDs(chamberStatus, 4);
+  
+  // Indicators start out green
+  for (int i = 0; i < NUM_INDICATORS; ++i) {
+    indicators[i].r = indicators[i].b = 0;
+    indicators[i].g = 255;
+  }
+  
   // Serial.println("start up done");
 }
 
@@ -197,6 +207,7 @@ void loop() {
   //Serial.println(loopCount);
   currentMillis = millis();
   loopBeginMillis = currentMillis;
+  static bool indicatorsNeedUpdate = true; // Need to update at first
 
   if (CAN_MSGAVAIL == CAN.checkReceive()) {
     //    Serial.println(".");
@@ -224,12 +235,19 @@ void loop() {
           //Serial.println(apiClass);
           switch (apiClass) {
             case INCAN_CL_SLED:
-              userStripProgramNumber = CANbuf[0];
-              // n.b. we will actually call the function later
-              // running the user strip program isn't taken to have
-              // high priority -- we run them periodically and then only
-              // after we have read sensors and made sure there's not a fresh
-              // can message waiting for us on the next loop pass
+              if (CANlen < NUM_INDICATORS*3) break; // Prevent funky errors.
+              for (int i = 0; i < NUM_INDICATORS; ++i) {
+                indicators[i].r = CANbuf[i*3+0];
+                indicators[i].g = CANbuf[i*3+1];
+                indicators[i].b = CANbuf[i*3+2];
+              } 
+              indicatorsNeedUpdate = true;
+//               userStripProgramNumber = CANbuf[0];
+//               n.b. we will actually call the function later
+//               running the user strip program isn't taken to have
+//               high priority -- we run them periodically and then only
+//               after we have read sensors and made sure there's not a fresh
+//               can message waiting for us on the next loop pass
               break;
           }
         } else {
@@ -273,29 +291,38 @@ void loop() {
   // it's possible, for example,  that we got a fresh message while we were reading sensors
   // and setting feedbackasa LEDs -- processing that is more important animation or running
   // user LED programs
+  
  if (CAN_MSGAVAIL != CAN.checkReceive()) {
-    currentMillis = millis(); // we may have unpredictable timing (could be appreciable, so freshen the clock)
-    if ((currentMillis - lastLedRefreshMillis) >= stripProgramRefreshMillis) {
-      // we rely on the stripProgramX's to remember state and keep track of timing so all we have to do is
-      // tell them the current clock
-      //Serial.println(userStripProgramNumber);
-      switch (userStripProgramNumber) {
-        case 0:
-          stripProgram0(currentMillis);
-          break;
-        case 1:
-          stripProgram1(currentMillis);
-          break;
-        case 2:
-          stripProgram2(currentMillis);
-          break;
-        default:
-          stripProgram0(currentMillis);
-          break;
+//    currentMillis = millis(); // we may have unpredictable timing (could be appreciable, so freshen the clock)
+//    if ((currentMillis - lastLedRefreshMillis) >= stripProgramRefreshMillis) {
+//      // we rely on the stripProgramX's to remember state and keep track of timing so all we have to do is
+//      // tell them the current clock
+//      //Serial.println(userStripProgramNumber);
+//      switch (userStripProgramNumber) {
+//        case 0:
+//          stripProgram0(currentMillis);
+//          break;
+//        case 1:
+//          stripProgram1(currentMillis);
+//          break;
+//        case 2:
+//          stripProgram2(currentMillis);
+//          break;
+//        default:
+//          stripProgram0(currentMillis);
+//          break;
+//      }
+//    }
+    if (indicatorsNeedUpdate) {
+      indicatorsNeedUpdate = false;
+      // Write indicator lights
+      for (int i = 0; i < NUM_INDICATORS; ++i) {
+        matrixPutPixel(&strip, indicators[i], 0, i, 9, 8);
       }
+      
+      // assume we can afford the time to show after we have done all the work
+      strip.show();
     }
-    // assume we can afford the time to show after we have done all the work
-    strip.show();
   }
 
   // just to help us understand our deadtime -- how variable is it?
