@@ -14,11 +14,11 @@
 
 // Uno uses a shield with a different chip select pin, 9.
 // the CANBed (Leonardo) uses 17.
-#ifdef ARDUINO_AVR_UNO
-const int SPI_CS_PIN = 9;
-#else
+//#ifdef ARDUINO_AVR_UNO
+//const int SPI_CS_PIN = 9;
+//#else
 const int SPI_CS_PIN = 17;
-#endif
+//#endif
 
 extern unsigned char CANflagRecv;
 extern unsigned char CANlen;

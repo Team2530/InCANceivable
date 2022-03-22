@@ -16,13 +16,25 @@
 #define BLUE 3
 #define NOBALL 4
 
+#define PROXPIN0 6
+#define PROXPIN1 5
+#define PROX_NEAR 10
+#define PROX_NOT_NEAR 8
+
 #define PIN_STRIP1 11
-const int numLEDs = 80;
+const int numLEDs = 72;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
 #define MAX_STRIP_BRIGHTNESS 64
 #define NUM_REV_LIGHT_SENSORS 4
-VCNL4040* proxSensors[4];  // we will use the convention that if proxSensors[i]==NULL, we don't use it
 
+  VCNL4040 sensor0;
+  VCNL4040 sensor1;
+//  proxSensors[0] = &sensor0;
+//  proxSensors[1] = &sensor1;
+//  proxSensors[2] = NULL;
+//  proxSensors[3] = NULL;
+VCNL4040* proxSensors[4]={&sensor0, &sensor1, NULL, NULL};  // we will use the convention that if proxSensors[i]==NULL, we don't use it
+int proxPins[4]={PROXPIN0,PROXPIN1,-1, -1};  // and if pin=-1 we won't use that either 
 extern MCP_CAN CAN;
 unsigned long myCanID;
 unsigned long lastStatusSendMillis = 0;
@@ -36,31 +48,44 @@ unsigned char enabled = 0;
 unsigned char autonomous = 0;
 unsigned char watchdog = 0;
 
-unsigned char userStripProgramNumber = 2;
+unsigned char userStripProgramNumber = 0;  // if userStripProgramNumber>0 we run that program ;
+// program 0 is display ball detection
 unsigned char chamberStatus[8] = {NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL, NOBALL};
 unsigned long canRefreshMillis = 1000L;
 // we send a message out on the canBus every 1000ms or when the status changes
 
 unsigned long lastLedRefreshMillis = 0L;
 unsigned long stripProgramRefreshMillis = 30L;
-int stripBrightness=64;
+int stripBrightness = 64;
 
 void setup() {
-  // two lines to set up the CAN functionality
+
+  Serial.begin(115200);
+  while (!Serial) {
+    ;
+  }
+
+  // two lines to set up
   myCanID = FRC_CAN_init();
   InCANceivable_setup();
-  //Serial.begin(115200);
- //while (!Serial) {
- //   ;
-//  }
-  // set up light strip controller
+  // set up light strip controller -- we do this first because we use it to monitor the boot sequence.
   strip.begin();
   strip.setBrightness(stripBrightness);  // if you crank the brightness up you pretty much just burn battery
   // visually it's not a lot different
   for (int i = 0; i < numLEDs; i++) {
     strip.setPixelColor(i, 255, 128, 0);
+    // flood fill all yellow
+  }
+
+  for (int col = 0; col < 9 ; col++) {
+    RGB color;
+    int row = 0;
+    color.r = 16; color.g = 128; color.b = 0;
+    matrixPutPixel(&strip, color, col, row, 9, 8); // top row indicates CAN setup
+    //    Serial.println(col);
   }
   strip.show();
+  // Serial.println("done setting up CAN");
   // set up the I2C for sensors
   // probably want this here since there may be multiple
   // devices -- if each is in it's own library it may be
@@ -68,46 +93,45 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
 #if defined(WIRE_HAS_TIMEOUT)
- // Serial.println("setting WireTimeout");
+  //Serial.println("setting WireTimeout");
   Wire.setWireTimeout(1000, true);
 #endif
 
   for (int i = 0; i < NUM_REV_LIGHT_SENSORS; ++i) {
-  //  Serial.print("initializing sensor " );
+   // Serial.print("initializing sensor " );
    // Serial.println(i);
-    switchMux(i);
+    //switchMux(i);
     // initColorSensor returns true on err
     if (initColorSensor()) {
-      chamberStatus[i] = NOBALL;
-      for (int pixel = i ; pixel < numLEDs; pixel += 8) {
-        strip.setPixelColor(pixel, 255, 0, 0);
+      chamberStatus[i] = NOBALL;  // we could set this as IDK and then we'll never try to read it again;
+      // setting it to NOBALL so we give it one shot in the main ballDetection loop before giving up.
+      // if we end up hanging we can change this
+      for (int col = 0; col < 9 ; col++) {
+        RGB color;
+        int row = i + 1;
+        color.r = 256; color.g = 5; color.b = 0;
+        matrixPutPixel(&strip, color, col, row, 9, 8);  // oops color sensor bad
       }
-      delay(500);
       strip.show();
     }
+
     else {
       // initialization ok,  calibrate the distance
       calibrateBallDetection(i);
-      for (int pixel = i ; pixel < numLEDs; pixel += 8) {
-        strip.setPixelColor(pixel, 0, 255, 0);
+      for (int col = 0; col < 9 ; col++) {
+        RGB color;
+        int row = i + 1;
+        color.r = 16; color.g = 128; color.b = 128;
+        matrixPutPixel(&strip, color, col, row, 9, 8);  //color sensor ok.
       }
-      delay(500);
       strip.show();
     }
   }
   //Serial.println("trying to initialize proximity sensors");
-  for (int i = 0; i < 4; i++) {
-    proxSensors[i] = NULL;
-  }
-  VCNL4040 sensor0;
-  VCNL4040 sensor1;
-  proxSensors[0] = &sensor0;
-  proxSensors[1] = &sensor1;
-  proxSensors[2]=NULL;
-  proxSensors[3]=NULL;
+ 
   for (int i = 0; i < 2; i++) {
     unsigned long currentMillis;
-    VCNL4040 *sensor=NULL;
+    VCNL4040 *sensor = NULL;
     switchMux(i + 4); // proximity is on ports 4,5
     delay(10);
     currentMillis = millis();
@@ -120,26 +144,37 @@ void setup() {
         sensor->powerOnProximity();
         sensor->powerOffAmbient();
         sensor->disableWhiteChannel();
-        //Serial.print("checking sensor number ");
-        //Serial.print(i);
-        //Serial.print(" value: ");
-        //Serial.println(sensor->getProximity());
-        //Serial.println(sensor->getProximity());
-        //Serial.println(sensor->getProximity());
-      }
-      else {
-      //  Serial.print("failed to get to connect sensor ");
-      //  Serial.print(i);
-     //   Serial.println(" disabling");
-        for (int pixel = i ; pixel < numLEDs; pixel += 8) {
-          strip.setPixelColor(pixel, 255, 186, 0);
+        sensor->setProxIntegrationTime(1); // can be up to 8 
+        sensor->setProxHighThreshold(PROX_NEAR); // magic empirical number
+        sensor->setProxLowThreshold(PROX_NOT_NEAR); // another magic empirical number
+        sensor->setProxInterruptType(VCNL4040_PS_INT_CLOSE); // PIN goes low when  balld is near
+        sensor->enableProxLogicMode();
+        pinMode(proxPins[i],INPUT);
+        for (int col = 0; col < 9 ; col++) {
+          RGB color;
+          int row = i + 1 + 4;
+          color.r = 16; color.g = 128; color.b = 0;
+          matrixPutPixel(&strip, color, col, row, 9, 8);  //VCNL4040 sensor ok.
         }
-        proxSensors[i] = NULL;
         strip.show();
-        delay(2000);
       }
     }
-    Serial.println((long) sensor, HEX);
+    else {
+      //  Serial.print("failed to get to connect sensor ");
+      //  Serial.print(i);
+      //   Serial.println(" disabling");
+      for (int col = 0; col < 9 ; col++) {
+        RGB color;
+        int row = i + 1 + 4;
+        color.r = 256; color.g = 5; color.b = 0;
+        matrixPutPixel(&strip, color, col, row, 9, 8);  //VCNL4040 sensor not ok.
+      }
+      strip.show();
+
+      proxSensors[i] = NULL;
+      strip.show();
+      delay(2000);
+    }
   }
   //
   updateChamberStatusLEDs(chamberStatus, 4);
@@ -159,38 +194,29 @@ void loop() {
   static int loopCount = 0;
   int changed = 0;
   loopCount++;
-
+  //Serial.println(loopCount);
   currentMillis = millis();
-  //  if (loopCount==1000){
-  //    loopCount=0;
-  //     Serial.print("ave loop time (microsec):");
-  //     Serial.println((currentMillis-benchmarkTime));
-  //     benchmarkTime=currentMillis;
-  //  }
-
   loopBeginMillis = currentMillis;
-  //Serial.println(".");
-  // check the can bus
+
   if (CAN_MSGAVAIL == CAN.checkReceive()) {
+    //    Serial.println(".");
     CAN.readMsgBufID(&canID, &CANlen, CANbuf);
     if (canRunning == 0) {
       canRunning = 1; // discard first CAN packet
     } else {
-      //
       if (FRC_CAN_isRIO(canID)) {
         // the RIO sends a universal heartbeat
         unsigned long heartbeatID = 0x01011840;
-        //Serial.println("rio");
 
         if (canID == heartbeatID) {
           //Serial.println("beep");
           parseRioHeartbeatByte(CANbuf[4], currentMillis);
           lastHeartbeatMillis = currentMillis;
-        } else {
-          //InCANceivable_msg_dump(canID,CANlen,CANbuf);
         }
+        //else {  it was a message with RIO's canID but not a heartBeatID -- would handle that here
+        //InCANceivable_msg_dump(canID,CANlen,CANbuf);
+        //}
       } else {
-        //Serial.println("calling isMe");
         if (FRC_CAN_isMe(canID, myCanID)) {
           int apiClass;
           int apiIndex;
@@ -208,26 +234,32 @@ void loop() {
           }
         } else {
           if (FRC_CAN_isBroadcast(canID)) {
-            // empirically this is a rare message
+            // empirically this is a rare message -- e.g. we've never seen it in practice.
             if (canID == 0) FRC_CRASH(0);
           }
         }
       }
     }
   }
-
-  //Serial.println(millis()-currentMillis);
+  //
+  // done checking the CAN bus
   // read sensors and send message to rio if chamberStatus changed
   // OR if it's been a while
   //Serial.println("calling detectBalls_prox");
-  changed = detectBalls_prox(chamberStatus, 4, proxSensors);
+  changed = detectBalls_prox_interrupt(chamberStatus, 4, proxPins);
+  if ((loopCount%100)==0 ){
+    Serial.println(millis()-currentMillis);
+  }
   //Serial.println(changed);
   if (changed) {
     // tell the canbus about it and update the LED's
     sendChamberStatus(chamberStatus, 4, myCanID);
-    updateChamberStatusLEDs(chamberStatus, 4);
+    if (userStripProgramNumber == 0) {
+      updateChamberStatusLEDs(chamberStatus, 4);
+    }
     lastStatusSendMillis = currentMillis;
-  } else {
+  }
+  else {
     // hasn't changed, if it's been a long time then re-tell the canbus
     // this may be overkill but its relatively cheap insurance in case
     // we are running long before roborio starts or is rebooting etc
@@ -239,9 +271,9 @@ void loop() {
   // finally we do the fluff task of updating the LEDs for user programs
   // we only want to do that if there is NOT a fresh CAN message waiting for us
   // it's possible, for example,  that we got a fresh message while we were reading sensors
-  // and setting feedback LEDs -- processing that is more important animation or running
+  // and setting feedbackasa LEDs -- processing that is more important animation or running
   // user LED programs
-  if (CAN_MSGAVAIL != CAN.checkReceive()) {
+ if (CAN_MSGAVAIL != CAN.checkReceive()) {
     currentMillis = millis(); // we may have unpredictable timing (could be appreciable, so freshen the clock)
     if ((currentMillis - lastLedRefreshMillis) >= stripProgramRefreshMillis) {
       // we rely on the stripProgramX's to remember state and keep track of timing so all we have to do is
@@ -262,6 +294,8 @@ void loop() {
           break;
       }
     }
+    // assume we can afford the time to show after we have done all the work
+    strip.show();
   }
 
   // just to help us understand our deadtime -- how variable is it?
@@ -300,16 +334,32 @@ void loop() {
   }
 }
 
-
 // some example LED strip programs
 void stripProgram0(unsigned long now) {
   // turns pixels off
-  int userLow = 35;
-  int userHigh = 50;
-  for (int i = userLow; i < userHigh; i++) {
-    strip.setPixelColor(i, 0, 0, 0);
+  int row;
+  int col = 8;
+  RGB color0;
+  RGB color1;
+  RGB colorEven;
+  RGB colorOdd;
+  Serial.println("strip zero running");
+  unsigned long secs;
+  color0.r = 0; color0.g = 0; color0.b = 128;
+  color1.r = 128; color1.g = 0; color1.b = 0;
+  secs = now / 1000;
+  if ((secs % 2)) {
+    colorEven = color0;
+    colorOdd = color1;
   }
-  strip.show();
+  else {
+    colorOdd = color0;
+    colorEven = color1;
+  }
+  for (row = 0; row < 8; row += 2) {
+    matrixPutPixel(&strip, colorEven, col, row, 9, 8);
+    matrixPutPixel(&strip, colorOdd, col, row + 1, 9, 8);
+  }
 }
 
 void stripProgram1(unsigned long now) {
@@ -431,8 +481,8 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
     else
       strip.setPixelColor(enabledPixel, 255, 120, 0);
   } else {
-    if ((currentMillis-lastMillis) < off){
-      stripBrightness=stripBrightness-1;
+    if ((currentMillis - lastMillis) < off) {
+      stripBrightness = stripBrightness - 1;
       strip.setBrightness(stripBrightness);
     }
     strip.setPixelColor(enabledPixel, 64, 20, 0); //1/4 brightness
@@ -454,13 +504,14 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
   } else {
     strip.setPixelColor(watchDogPixel, 64, 20, 0); //1/4 brightness
   }
-  strip.show();
+  //strip.show();
 }
 
 void sendChamberStatus(unsigned char* statusbytes, int numSensors, unsigned long canID) {
   int APIClassId = INCAN_CL_CHUTE;
   int APIIndex = 0;
-
+  // Serial.println("sending chamber status");
+  //Serial.println(statusbytes);
   canID = FRC_CAN_embed(canID, APIClassId, APIIndex);
   CAN.sendMsgBuf(canID, FRC_EXT, numSensors, statusbytes);
 }
@@ -472,11 +523,11 @@ void sendChamberStatus(unsigned char* statusbytes, int numSensors, unsigned long
 //}
 
 void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
-  int chamberLow[4] = {6, 4,2, 0};
+  int chamberLow[4] = {6, 4, 2, 0};
   int chamberHigh[4] = {8, 6, 4, 2 };
-  int colMin=1;
-  int colMax=8;
-  int ledPerColumn=8;
+  int colMin = 1;
+  int colMax = 8;
+  int ledPerColumn = 8;
   int rgb[3] = { 0, 0, 0 };
   int i;
   int  col;
@@ -502,16 +553,16 @@ void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
         rgb[0] = 0; rgb[1] = 255; rgb[2] = 0;
         break;
     }
-    color.r=rgb[0];
-    color.g=rgb[1];
-    color.b=rgb[2];
+    color.r = rgb[0];
+    color.g = rgb[1];
+    color.b = rgb[2];
     for (int row = chamberLow[i]; row < chamberHigh[i]; row++) {
-      for(col=colMin;col<colMax;col++){
-         matrixPutPixel(&strip,color,col,row,9,8);
+      for (col = colMin; col < colMax; col++) {
+        matrixPutPixel(&strip, color, col, row, 9, 8);
       }
-   //   Serial.print(" content ");
-   //   Serial.print(buf[i]);
-   //   Serial.println(" done ");
+      //   Serial.print(" content ");
+      //   Serial.print(buf[i]);
+      //   Serial.println(" done ");
     }
   }
   strip.show();

@@ -101,6 +101,7 @@ uint16_t getColorSensorProximity(unsigned char addr = COLORSENSORV3_ADDR);
 Color getColorSensorColor(unsigned char addr = COLORSENSORV3_ADDR);
 int detectBalls(unsigned char* states, int nsensors = 2);
 int detectBalls_prox(unsigned char* states, int nsensors = 2, void** proxSensors=NULL);
+int detectBalls_prox_interrupt(unsigned char* states, int nsensors = 2, int* proxPins=NULL);
 bool getChannels(uint32_t* rgb, unsigned char addr = COLORSENSORV3_ADDR);
 int switchMux(unsigned char channel, unsigned char mux_addr = 0x70);
 void calibrateBallDetection(int sensorNumber=0, unsigned char channel = COLORSENSORV3_ADDR);

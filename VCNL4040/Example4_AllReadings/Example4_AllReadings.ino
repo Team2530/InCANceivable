@@ -25,6 +25,7 @@
 //Click here to get the library: http://librarymanager/All#SparkFun_VCNL4040
 #include "SparkFun_VCNL4040_Arduino_Library.h"
 VCNL4040 proximitySensor;
+#define IPIN 11
 
 void setup()
 {
@@ -39,11 +40,19 @@ void setup()
   proximitySensor.powerOnProximity();
   proximitySensor.powerOnAmbient();
   proximitySensor.enableWhiteChannel();
+  proximitySensor.setProxHighThreshold(40);
+  proximitySensor.setProxLowThreshold(40); 
+  proximitySensor.setProxInterruptType(VCNL4040_PS_INT_BOTH);
+  proximitySensor.enableProxLogicMode(); 
+  pinMode(IPIN,INPUT_PULLUP);
 }
 
 void loop()
 {
+  int proxState=digitalRead(IPIN);
   unsigned int proxValue = proximitySensor.getProximity();
+  Serial.print(proxState);
+  Serial.print(",");
   //Serial.print("Prox value[");
   Serial.print(proxValue);
   //Serial.print(" ");

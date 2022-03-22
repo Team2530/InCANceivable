@@ -74,12 +74,12 @@ boolean VCNL4040::begin(TwoWire &wirePort) {
 
   setIRDutyCycle(40); //Set to highest duty cycle
 
-  setProxIntegrationTime(8); //Set to max integration
+  setProxIntegrationTime(8); // max is 8 
 
   setProxResolution(16); //Set to 16-bit output
   
   enableSmartPersistance(); //Turn on smart presistance
-
+  
   powerOnProximity(); //Turn on prox sensing
 
   //setAmbientIntegrationTime(VCNL4040_ALS_IT_80MS); //Keep it short

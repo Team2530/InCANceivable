@@ -9,8 +9,8 @@ unsigned long int inCAN_makeBaseID(int devNum) {
   unsigned long int tmp = 0;
   tmp = devNum;
   ret = INCAN_MASK | tmp;
-  Serial.print("CAN BUS device ID:");
-  Serial.println(devNum);
+  //  Serial.print("CAN BUS device ID:");
+  //Serial.println(devNum);
   return(ret);
 }
 
@@ -22,7 +22,7 @@ unsigned long int  FRC_CAN_init() {
   devNum = digitalRead(FRC_DEV_PIN2) << 1 | digitalRead(FRC_DEV_PIN1);
   myCanId = inCAN_makeBaseID(devNum);
   delay(100);
-  Serial.println("FRC_CAN_init -- initializing CAN board");
+  //Serial.println("FRC_CAN_init -- initializing CAN board");
 
   while (CAN_OK != CAN.begin(FRC_CAN_SPEED)) {
     Serial.println("CAN BUS Shield init fail");
@@ -30,7 +30,7 @@ unsigned long int  FRC_CAN_init() {
     delay(100);
   }
 
-  Serial.println("CAN BUS Shield init ok!");
+  //Serial.println("CAN BUS Shield init ok!");
   return(myCanId);
 }
 
