@@ -215,9 +215,9 @@ int detectBalls_prox(unsigned char* oldstates, int nsensors, void **proxPointers
 	    // oops maybe a problem switching the mux?  try one more time
 	    switchMux(i);
 	  }
-          Serial.print(i);
-          Serial.print(" ");
-          Serial.println(millis()-loopBegin);
+          //Serial.print(i);
+          //Serial.print(" ");
+          //Serial.println(millis()-loopBegin);
           //delayMicroseconds(10);
 	  if (proxBallPresent==-1){
 	    // get the proximity reading from the color sensor
@@ -327,9 +327,9 @@ int detectBalls_prox_interrupt(unsigned char* oldstates, int nsensors, int *prox
 	// oops maybe a problem switching the mux?  try one more time
 	switchMux(i);
       }
-      Serial.print(i);
-      Serial.print(" ");
-      Serial.println(millis()-loopBegin);
+      //Serial.print(i);
+      //Serial.print(" ");
+      //Serial.println(millis()-loopBegin);
       //delayMicroseconds(10);
       if (proxBallPresent==-1){
 	// get the proximity reading from the color sensor
