@@ -533,12 +533,16 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
 
 void updateBatteryIndicator() {
   RGB color;
-  color.r = (uint8_t)((1.0 - battLvl) * 255.0);
+  color.r = (uint8_t)(min((1.0 - battLvl) * 255.0 * 2.0, 255.0));
   color.g = (uint8_t)((battLvl) * 255.0);
+  color.b = 0;
 
-  uint8_t lvl = max(min((uint8_t)(battLvl * 8.99), 0), 8);
-  for (int i = 0; i < lvl; ++i) {
-    matrixPutPixel(&strip, color, 8, 8-lvl, 9, 8);
+  RGB clear; clear.r = clear.g = clear.b = 0;
+
+  for (int i = 0; i < 9; ++i) {
+    if (((double)i/8) < battLvl)
+      matrixPutPixel(&strip, color, 8, 7-i, 9, 8);
+    else matrixPutPixel(&strip, clear, 8, 7-i, 9, 8);
   }
 }
 
