@@ -63,10 +63,10 @@ RGB indicators[NUM_INDICATORS];
 
 void setup() {
 
-//  Serial.begin(115200);
-//  while (!Serial) {
-//    ;
-//  }
+// Serial.begin(115200);
+ // while (!Serial) {
+ //   ;
+  //  }
 
   // two lines to set up
   myCanID = FRC_CAN_init();
@@ -97,13 +97,13 @@ void setup() {
   Wire.setClock(400000);
 #if defined(WIRE_HAS_TIMEOUT)
   //Serial.println("setting WireTimeout");
-  Wire.setWireTimeout(1000, true);
+  Wire.setWireTimeout(100, true);
 #endif
-
-  for (int i = 0; i < NUM_REV_LIGHT_SENSORS; ++i) {
+  
+  for (int i = 0; i < NUM_REV_LIGHT_SENSORS; i++) {
    // Serial.print("initializing sensor " );
    // Serial.println(i);
-    //switchMux(i);
+    switchMux(i);
     // initColorSensor returns true on err
     if (initColorSensor()) {
       chamberStatus[i] = NOBALL;  // we could set this as IDK and then we'll never try to read it again;
@@ -121,6 +121,7 @@ void setup() {
     else {
       // initialization ok,  calibrate the distance
       calibrateBallDetection(i);
+      delay(1);
       for (int col = 0; col < 9 ; col++) {
         RGB color;
         int row = i + 1;
@@ -265,9 +266,9 @@ void loop() {
   // OR if it's been a while
   //Serial.println("calling detectBalls_prox");
   changed = detectBalls_prox_interrupt(chamberStatus, 4, proxPins);
-  if ((loopCount%100)==0 ){
-    Serial.println(millis()-currentMillis);
-  }
+//  if ((loopCount%100)==0 ){
+//    Serial.println(millis()-currentMillis);
+//  }
   //Serial.println(changed);
   if (changed) {
     // tell the canbus about it and update the LED's
@@ -501,20 +502,21 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
     alliance = BLUE;
     strip.setPixelColor(alliancePixel, 0, 0, 255);
   }
-  if (inByte & 0x1) {
+  if (inByte & 0x2) {
     enabled = 1;
     if ((currentMillis - lastMillis) < off)
       strip.setPixelColor(enabledPixel, 0, 0, 0);
     else
       strip.setPixelColor(enabledPixel, 255, 120, 0);
-  } else {
-    if ((currentMillis - lastMillis) < off) {
-      stripBrightness = stripBrightness - 1;
-      strip.setBrightness(stripBrightness);
-    }
-    strip.setPixelColor(enabledPixel, 64, 20, 0); //1/4 brightness
-    enabled = 0;
-  }
+  } 
+  //else {
+    //if ((currentMillis - lastMillis) < off) {
+    //  stripBrightness = stripBrightness - 1;
+    //  strip.setBrightness(stripBrightness);
+   // }
+    //strip.setPixelColor(enabledPixel, 64, 20, 0); //1/4 brightness
+    //enabled = 0;
+  //}
   if (inByte & 0x4) {
     autonomous = 1;
     strip.setPixelColor(autonomousPixel, 255, 120, 0);

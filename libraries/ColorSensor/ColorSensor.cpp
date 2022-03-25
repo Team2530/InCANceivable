@@ -1,7 +1,7 @@
 #include "ColorSensor.h"
 #include <Arduino.h>
 // Readings from the sensors when there isnt anything inside the chute.
-static uint16_t baseProxReadings[8] = { 0, 0 }; // Add more if needed
+static uint16_t baseProxReadings[8] = { 50, 50, 50, 50 }; // Add more if needed
 
 uint32_t read20BitRegister(unsigned char addr, ColorSensorRegister reg, bool* err) {
     uint32_t data;
@@ -409,10 +409,18 @@ void calibrateBallDetection(int channel, unsigned char addr) {
   // moved which one up calling function -- we don't want to deal with keeping track
   // of how many sensors 
   //for (int i = 0; i < 2; ++i) {
-        switchMux(channel);
-        delay(50);
-        baseProxReadings[channel] = getColorSensorProximity();
-        //Serial.println(baseProxReadings[channel]);
-	//       Serial.println(baseProxReadings[channel]);
+  int proxValue=0;
+  switchMux(channel);
+  delay(50);
+  proxValue = getColorSensorProximity();
+  if (proxValue<200) {
+    baseProxReadings[channel] = getColorSensorProximity();
+  }
+  // else proxValue is bogus -- run with default 
+ 
+  //  Serial.print(channel) ;
+  // Serial.print( " value");
+  //Serial.println(baseProxReadings[channel]);
+//       Serial.println(baseProxReadings[channel]);
  //
 }
