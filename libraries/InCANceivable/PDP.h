@@ -89,7 +89,7 @@ union PdpStatusEnergy {
 
 bool PDP_isStatusMsg(uint8_t APID);
 bool PDP_isPDP(uint32_t canID);
-double PDP_getTemp(uint8_t CANmsg[8]);
-double PDP_getVoltage(uint8_t CANmsg[8]);
+double PDP_getTemp(uint8_t* CANmsg);
+double PDP_getVoltage(uint8_t* CANmsg);
 
 #endif

@@ -1,7 +1,7 @@
 #include <pdp.h>
 
 // Return the "voltage" measurement from the Vex PDP (0-100)
-double PDP_getVoltage(uint8_t CANmsg[8]) {
+double PDP_getVoltage(uint8_t* CANmsg) {
     PdpStatus3 stat;
     for (int i = 0; i < 8; ++i) {
         stat.data[i] = CANmsg[i];
@@ -10,7 +10,7 @@ double PDP_getVoltage(uint8_t CANmsg[8]) {
 }
 
 // Return the temperature measurement from the PDP
-double PDP_getTemp(uint8_t CANmsg[8]) {
+double PDP_getTemp(uint8_t* CANmsg) {
     PdpStatus3 stat;
     for (int i = 0; i < 8; ++i) {
         stat.data[i] = CANmsg[i];

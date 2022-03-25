@@ -10,6 +10,8 @@
 #include <SparkFun_VCNL4040_Arduino_Library.h>
 #include <Wire.h>
 #include <matrix.h>
+#include <PDP.h>
+
 #define IDK 0
 #define RED 1
 #define GREEN 2
@@ -59,7 +61,10 @@ unsigned long stripProgramRefreshMillis = 30L;
 int stripBrightness = 64;
 
 #define NUM_INDICATORS 2
-RGB indicators[NUM_INDICATORS];
+static RGB indicators[NUM_INDICATORS];
+
+// Latest received battery level, 0 to 1, PDP sends 0-100
+double battLvl = 1.0;
 
 void setup() {
 
@@ -188,6 +193,9 @@ void setup() {
     indicators[i].r = indicators[i].b = 0;
     indicators[i].g = 255;
   }
+
+  // Init an extra filter for the PDP
+  CAN.init_Filt(2, FRC_EXT, PDP_MASK);
   
   // Serial.println("start up done");
 }
@@ -228,28 +236,31 @@ void loop() {
         //else {  it was a message with RIO's canID but not a heartBeatID -- would handle that here
         //InCANceivable_msg_dump(canID,CANlen,CANbuf);
         //}
-      } else {
-        if (FRC_CAN_isMe(canID, myCanID)) {
-          int apiClass;
-          int apiIndex;
-          FRC_CAN_extractClass(canID, &apiClass, &apiIndex);
-          //Serial.println(apiClass);
-          switch (apiClass) {
-            case INCAN_CL_SLED:
-              if (CANlen < NUM_INDICATORS*3) break; // Prevent funky errors.
-              for (int i = 0; i < NUM_INDICATORS; ++i) {
-                indicators[i].r = CANbuf[i*3+0];
-                indicators[i].g = CANbuf[i*3+1];
-                indicators[i].b = CANbuf[i*3+2];
-              } 
-              indicatorsNeedUpdate = true;
+      } else if (FRC_CAN_isMe(canID, myCanID)) {
+        int apiClass;
+        int apiIndex;
+        FRC_CAN_extractClass(canID, &apiClass, &apiIndex);
+        //Serial.println(apiClass);
+        switch (apiClass) {
+          case INCAN_CL_SLED:
+            if (CANlen < NUM_INDICATORS*3) break; // Prevent funky errors.
+            for (int i = 0; i < NUM_INDICATORS; ++i) {
+              indicatorsNeedUpdate |= indicators[i].r != CANbuf[i*3+0] || indicators[i].g != CANbuf[i*3+1] || indicators[i].b != CANbuf[i*3+2];
+              indicators[i].r = CANbuf[i*3+0];
+              indicators[i].g = CANbuf[i*3+1];
+              indicators[i].b = CANbuf[i*3+2];
+            }
 //               userStripProgramNumber = CANbuf[0];
 //               n.b. we will actually call the function later
 //               running the user strip program isn't taken to have
 //               high priority -- we run them periodically and then only
 //               after we have read sensors and made sure there's not a fresh
 //               can message waiting for us on the next loop pass
-              break;
+            break;
+          }
+        } else if (PDP_isPDP(canID)) { 
+          if (PDP_isStatusMsg((canID >> 6) & 0xFF)) {
+            battLvl = PDP_getVoltage(CANbuf) / 100.0;
           }
         } else {
           if (FRC_CAN_isBroadcast(canID)) {
@@ -257,7 +268,6 @@ void loop() {
             if (canID == 0) FRC_CRASH(0);
           }
         }
-      }
     }
   }
   //
@@ -293,37 +303,22 @@ void loop() {
   // and setting feedbackasa LEDs -- processing that is more important animation or running
   // user LED programs
   
- if (CAN_MSGAVAIL != CAN.checkReceive()) {
-//    currentMillis = millis(); // we may have unpredictable timing (could be appreciable, so freshen the clock)
-//    if ((currentMillis - lastLedRefreshMillis) >= stripProgramRefreshMillis) {
-//      // we rely on the stripProgramX's to remember state and keep track of timing so all we have to do is
-//      // tell them the current clock
-//      //Serial.println(userStripProgramNumber);
-//      switch (userStripProgramNumber) {
-//        case 0:
-//          stripProgram0(currentMillis);
-//          break;
-//        case 1:
-//          stripProgram1(currentMillis);
-//          break;
-//        case 2:
-//          stripProgram2(currentMillis);
-//          break;
-//        default:
-//          stripProgram0(currentMillis);
-//          break;
-//      }
-//    }
+  if (CAN_MSGAVAIL != CAN.checkReceive()) {
+    currentMillis = millis(); // we may have unpredictable timing (could be appreciable, so freshen the clock)
+
+    // Update battery lights
+    updateBatteryIndicator();
+
     if (indicatorsNeedUpdate) {
       indicatorsNeedUpdate = false;
       // Write indicator lights
       for (int i = 0; i < NUM_INDICATORS; ++i) {
         matrixPutPixel(&strip, indicators[i], 0, i, 9, 8);
       }
-      
       // assume we can afford the time to show after we have done all the work
-      strip.show();
     }
+
+    strip.show();
   }
 
   // just to help us understand our deadtime -- how variable is it?
@@ -534,6 +529,17 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
     strip.setPixelColor(watchDogPixel, 64, 20, 0); //1/4 brightness
   }
   //strip.show();
+}
+
+void updateBatteryIndicator() {
+  RGB color;
+  color.r = (uint8_t)((1.0 - battLvl) * 255.0);
+  color.g = (uint8_t)((battLvl) * 255.0);
+
+  uint8_t lvl = max(min((uint8_t)(battLvl * 8.99), 0), 8);
+  for (int i = 0; i < lvl; ++i) {
+    matrixPutPixel(&strip, color, 8, 8-lvl, 9, 8);
+  }
 }
 
 void sendChamberStatus(unsigned char* statusbytes, int numSensors, unsigned long canID) {
