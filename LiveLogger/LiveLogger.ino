@@ -15,28 +15,21 @@ extern MCP_CAN CAN;
 void setup() {
   Serial.begin(115200);
 
-  attachInterrupt(digitalPinToInterrupt(CAN_INT_PIN), MCP2515_ISR, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(CAN_INT_PIN), MCP2515_ISR, FALLING);
 
   // Initialize the CAN chip
   while (CAN_OK != CAN.begin(FRC_CAN_SPEED)) delay(100);
 
-  // Motor controller mask
+  // No masks/filters.
   CAN.init_Mask(0, FRC_EXT, 0);
   CAN.init_Filt(0, FRC_EXT, 0);
-  //Serial.println("Init.");
 }
 
 void loop() {
   uint32_t canID;
   uint8_t CANbuf[8];
   uint8_t CANlen = 8;
-  int messageAPIclass;
-  int messageAPIindex;
 
-//  // CAN mesg?
-//  if (CANflagRecv) {
-//    CANflagRecv = 0;
-//    Serial.println("Message!");
   while (CAN_MSGAVAIL == CAN.checkReceive()) {
     CAN.readMsgBufID(&canID, &CANlen, CANbuf);
     Serial.print(millis());
@@ -48,7 +41,5 @@ void loop() {
       else Serial.print("0");
     }
     Serial.println();
-    //InCANceivable_msg_dump(canID, CANlen, CANbuf);
   }
-  //}
 }
