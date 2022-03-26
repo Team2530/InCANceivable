@@ -100,6 +100,38 @@ def getPDPVoltage(data):
 # (10, 8, 3)    InCANceivable
 
 
+class PDPStatusMsg1(Structure):
+    _pack_ = 1
+    _fields_ = [("chan1_h8", c_uint, 8),
+                ("chan2_h6", c_uint, 6),
+                ("chan1_l2", c_uint, 2),
+                ("chan3_h4", c_uint, 4),
+                ("chan2_l4", c_uint, 4),
+                ("chan4_h2", c_uint, 2),
+                ("chan3_l6", c_uint, 6),
+                ("chan4_l8", c_uint, 8),
+                ("chan5_h8", c_uint, 8),
+                ("chan6_h6", c_uint, 6),
+                ("chan5_l2", c_uint, 2),
+                ("reserved4", c_uint, 4),
+                ("chan6_l4", c_uint, 4)]
+
+
+class PDPStatusMsg3(Structure):
+    _pack_ = 1
+    _fields_ = [("chan13_h8", c_uint, 8),
+                ("chan14_h6", c_uint, 6),
+                ("chan13_l2", c_uint, 2),
+                ("chan15_h4", c_uint, 4),
+                ("chan14_l4", c_uint, 4),
+                ("chan16_h2", c_uint, 2),
+                ("chan15_l6", c_uint, 6),
+                ("chan16_l8", c_uint, 8),
+                ("internalResBattery_mOhms", c_uint, 8),
+                ("busVoltage", c_uint, 8),
+                ("temp ", c_uint, 8)]
+
+
 if __name__ == "__main__":
     lines = [[int(i) for i in line.split(',')]
              for line in open("logs/LOG_13.CSV").readlines()[1:]]
@@ -107,36 +139,6 @@ if __name__ == "__main__":
     devices = set()
     voltages = []
     channelcurrents = [[]] * 16
-
-    class PDPStatusMsg1(Structure):
-        _pack_ = 1
-        _fields_ = [("chan1_h8", c_uint, 8),
-                    ("chan2_h6", c_uint, 6),
-                    ("chan1_l2", c_uint, 2),
-                    ("chan3_h4", c_uint, 4),
-                    ("chan2_l4", c_uint, 4),
-                    ("chan4_h2", c_uint, 2),
-                    ("chan3_l6", c_uint, 6),
-                    ("chan4_l8", c_uint, 8),
-                    ("chan5_h8", c_uint, 8),
-                    ("chan6_h6", c_uint, 6),
-                    ("chan5_l2", c_uint, 2),
-                    ("reserved4", c_uint, 4),
-                    ("chan6_l4", c_uint, 4)]
-
-    class PDPStatusMsg3(Structure):
-        _pack_ = 1
-        _fields_ = [("chan13_h8", c_uint, 8),
-                    ("chan14_h6", c_uint, 6),
-                    ("chan13_l2", c_uint, 2),
-                    ("chan15_h4", c_uint, 4),
-                    ("chan14_l4", c_uint, 4),
-                    ("chan16_h2", c_uint, 2),
-                    ("chan15_l6", c_uint, 6),
-                    ("chan16_l8", c_uint, 8),
-                    ("internalResBattery_mOhms", c_uint, 8),
-                    ("busVoltage", c_uint, 8),
-                    ("temp ", c_uint, 8)]
 
     def readPDPChannels(apiid, data):
         global channelcurrents

@@ -1,12 +1,12 @@
 from typing import DefaultDict
-from logparser import parseCANID, constructCANID
+from logparser import parseCANID, constructCANID, PDPStatusMsg1
 import pickle
 
 messages = [[int(n) for n in line.strip().split(',')]
             for line in open("talon.csv").readlines()]
 
 for message in messages:
-    print(((message[0] & 0b1111111) << 4) | (message[1] >> 4))
+    print(message)
 
 # apid: 97
 # combined: [132, 0, 100, 186, 0, 0, 0, 255]
