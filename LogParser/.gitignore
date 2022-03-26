@@ -1,1 +1,3 @@
 PDPtesting
+*.p
+__pycache__

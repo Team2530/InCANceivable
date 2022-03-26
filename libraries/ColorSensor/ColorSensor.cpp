@@ -293,16 +293,14 @@ int detectBalls_prox_interrupt(unsigned char* oldstates, int nsensors, int *prox
       // Serial.println(" is IDK");
       continue;
     }
-    if (proxPins[i]>=0){
-      if (digitalRead(proxPins[i])){
-	  proxBallPresent=0;
-	}
-      else{    //   Serial.println("prox ball absent");
-	proxBallPresent=1;
-      }
-    }
-    else {
-      proxBallPresent=-1;
+    if (proxPins[i]>=0) {
+        if (digitalRead(proxPins[i])){
+	        proxBallPresent=0;
+	    } else {    //   Serial.println("prox ball absent");
+	        proxBallPresent = 1;
+        }
+    } else {
+      proxBallPresent = -1; // Pin error
     }
     // now if proxBallPresent ==  0 there is a proximity sensor on this channel and no ball
     //  if 1 then a ball is present

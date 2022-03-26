@@ -19,7 +19,7 @@ static char filename[30] = "log_0.csv";
 void setup() {
   // Start a serial connection for local debugging
   // make sure to remove all `Serial` stuff when not connecting to the board over USB
-  Serial.begin(115200);
+  //Serial.begin(115200);
 
   // Specific to the Seeed CAN shield - A pin is used to send a "interrupt" (very low-level message) to the board via a specific pin.
   // In the case of the Seeed CAN shield, this pin is 2
@@ -45,7 +45,7 @@ void setup() {
   for (int logn = 0; SD.exists(filename); ++logn) {
     sprintf(filename, "log_%d.csv", logn);
   }
-  Serial.println(filename);
+  //Serial.println(filename);
 
   logFile = SD.open(filename, FILE_WRITE);
   logFile.println("timestamp_millis,can_id,data_length,data_0,data_1,data_2,data_3,data_4,data_5,data_6,data_7");
