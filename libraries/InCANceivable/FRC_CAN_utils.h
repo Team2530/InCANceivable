@@ -7,7 +7,7 @@
 // them from walking on each other you have to set the device number by 
 // grounding some pins. I assume you use pins 10 and 11 for this purpose
 #define FRC_DEV_PIN1 10 
-#define FRC_DEV_PIN2 11
+#define FRC_DEV_PIN2 9
 // these are pulled high by the internal resistor;   
 // 10 and 11 were chose because they are in close proximity to ground on the
 // CANBed board  (11 can be grounded wih a standard jumper off and old 
