@@ -11,6 +11,7 @@
 #include <Wire.h>
 #include <matrix.h>
 #include <PDP.h>
+#include <logo.h>
 
 #define IDK 0
 #define RED 1
@@ -27,6 +28,8 @@
 const int numLEDs = 72;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
 #define MAX_STRIP_BRIGHTNESS 64
+#define MATRIX_WIDTH 9
+#define MATRIX_HEIGHT 8
 #define NUM_REV_LIGHT_SENSORS 4
 
 VCNL4040 sensor0;
@@ -64,7 +67,7 @@ int stripBrightness = 64;
 static RGB indicators[NUM_INDICATORS];
 
 // Latest received battery level, 0 to 1, PDP sends 0-100
-double battLvl = 1.0;
+double battLvl = 1.0/8.0;
 
 void setup() {
 
@@ -217,6 +220,8 @@ void loop() {
   currentMillis = millis();
   loopBeginMillis = currentMillis;
   static bool indicatorsNeedUpdate = true; // Need to update at first
+  static int dispMode = 0;
+  static bool modeChg = true;
 
   if (CAN_MSGAVAIL == CAN.checkReceive()) {
     //    Serial.println(".");
@@ -242,7 +247,7 @@ void loop() {
         FRC_CAN_extractClass(canID, &apiClass, &apiIndex);
         //Serial.println(apiClass);
         switch (apiClass) {
-          case INCAN_CL_SLED:
+          case INCAN_CL_SLED: // Indicators
             if (CANlen < NUM_INDICATORS*3) break; // Prevent funky errors.
             for (int i = 0; i < NUM_INDICATORS; ++i) {
               indicatorsNeedUpdate |= indicators[i].r != CANbuf[i*3+0] || indicators[i].g != CANbuf[i*3+1] || indicators[i].b != CANbuf[i*3+2];
@@ -257,17 +262,22 @@ void loop() {
 //               after we have read sensors and made sure there's not a fresh
 //               can message waiting for us on the next loop pass
             break;
-          }
-        } else if (PDP_isPDP(canID)) { 
-          if (PDP_isStatusMsg((canID >> 6) & 0xFF)) {
-            battLvl = PDP_getVoltage(CANbuf) / 100.0;
-          }
-        } else {
-          if (FRC_CAN_isBroadcast(canID)) {
-            // empirically this is a rare message -- e.g. we've never seen it in practice.
-            if (canID == 0) FRC_CRASH(0);
-          }
+
+          case INCAN_CL_DISP: // Full-screen animations, images, etc. for climb and boot
+            if (CANlen > 0) dispMode = CANbuf[0];
+            modeChg = true;
+            break;
         }
+      } else if (PDP_isPDP(canID)) { 
+        if (PDP_isStatusMsg((canID >> 6) & 0xFF)) {
+          battLvl = PDP_getVoltage(CANbuf) / 100.0;
+        }
+      } else {
+        if (FRC_CAN_isBroadcast(canID)) {
+          // empirically this is a rare message -- e.g. we've never seen it in practice.
+          if (canID == 0) FRC_CRASH(0);
+        }
+      }
     }
   }
   //
@@ -283,9 +293,7 @@ void loop() {
   if (changed) {
     // tell the canbus about it and update the LED's
     sendChamberStatus(chamberStatus, 4, myCanID);
-    if (userStripProgramNumber == 0) {
-      updateChamberStatusLEDs(chamberStatus, 4);
-    }
+    updateChamberStatusLEDs(chamberStatus, 4);
     lastStatusSendMillis = currentMillis;
   }
   else {
@@ -317,8 +325,6 @@ void loop() {
       }
       // assume we can afford the time to show after we have done all the work
     }
-
-    strip.show();
   }
 
   // just to help us understand our deadtime -- how variable is it?
@@ -352,9 +358,18 @@ void loop() {
   if ((currentMillis - lastHeartbeatMillis) > 100L) {
     haveHeartbeat = 0;
     strip.setPixelColor(heartbeatPixel, 139, 0, 0); // dark red
-    strip.show();  // we are not expecting to call this often so no harm in showing
     // if we are hitting it hard things are broken anyway
   }
+
+  // Display programs
+  if (dispMode == 1)
+    stripProgramBoot();
+  else if (dispMode == 2)
+    stripProgram0(currentMillis);
+  else if (dispMode == 0 && modeChg) 
+    updateChamberStatusLEDs(chamberStatus, 4); 
+    
+  strip.show();
 }
 
 // some example LED strip programs
@@ -366,7 +381,6 @@ void stripProgram0(unsigned long now) {
   RGB color1;
   RGB colorEven;
   RGB colorOdd;
-  Serial.println("strip zero running");
   unsigned long secs;
   color0.r = 0; color0.g = 0; color0.b = 128;
   color1.r = 128; color1.g = 0; color1.b = 0;
@@ -383,6 +397,16 @@ void stripProgram0(unsigned long now) {
     matrixPutPixel(&strip, colorEven, col, row, 9, 8);
     matrixPutPixel(&strip, colorOdd, col, row + 1, 9, 8);
   }
+}
+
+void stripProgramBoot() {
+  matrixPutImage(
+    &strip, 
+    (unsigned char*)logo,
+    0, 0,
+    MATRIX_WIDTH, MATRIX_HEIGHT,
+    logo_width, logo_height
+  );
 }
 
 void stripProgram1(unsigned long now) {
@@ -439,18 +463,16 @@ void stripProgram1(unsigned long now) {
         }
         break;
     }
-    strip.show();
   }
   //  else {
   //     same pattern as before don't change a thing
   //  }
-
 }
 
 void stripProgram2(unsigned long now) {
   // for fun we'll make tri colored snakes rolling around the leds
   int highLED = 72;
-  int lowLED = 64;
+  int lowLED = 0;
   int snakeRed[15] = { 0, 20, 60, 120, 255,   120, 60, 20, 0, 0,  0, 0, 0, 0, 0 };
   int snakeGreen[15] = { 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0, 0, 0, 0 };
   int snakeBlue[15] = { 0, 0, 0, 0, 0, 0, 0, 20, 60, 120, 255, 120, 60, 20, 0 };
@@ -470,7 +492,6 @@ void stripProgram2(unsigned long now) {
     offset++;
     offset = offset % (highLED - lowLED);  // mode the length of the section leds
   }
-  strip.show();
 }
 
 
@@ -528,12 +549,11 @@ void parseRioHeartbeatByte(unsigned char inByte, unsigned long currentMillis) {
   } else {
     strip.setPixelColor(watchDogPixel, 64, 20, 0); //1/4 brightness
   }
-  //strip.show();
 }
 
 void updateBatteryIndicator() {
   RGB color;
-  color.r = (uint8_t)(min((1.0 - battLvl) * 255.0 * 2.0, 255.0));
+  color.r = (uint8_t)(min((1.0 - battLvl) * 512.0, 255.0));
   color.g = (uint8_t)((battLvl) * 255.0);
   color.b = 0;
 
@@ -541,8 +561,8 @@ void updateBatteryIndicator() {
 
   for (int i = 0; i < 9; ++i) {
     if (((double)i/8) < battLvl)
-      matrixPutPixel(&strip, color, 8, 7-i, 9, 8);
-    else matrixPutPixel(&strip, clear, 8, 7-i, 9, 8);
+      matrixPutPixel(&strip, color, 8, 7-i, MATRIX_WIDTH, MATRIX_HEIGHT);
+    else matrixPutPixel(&strip, clear, 8, 7-i, MATRIX_WIDTH, MATRIX_HEIGHT);
   }
 }
 
@@ -604,5 +624,4 @@ void updateChamberStatusLEDs(unsigned char* buf, int numChambers) {
       //   Serial.println(" done ");
     }
   }
-  strip.show();
 }

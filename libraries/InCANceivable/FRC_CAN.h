@@ -74,6 +74,7 @@ on the CAN bus for an FRC robot.  We assume you have the CANBed libary in place 
 #define INCAN_CL_ANAUS 16L  // Analog Ultrasound/ 
 #define INCAN_CL_GPIO 20L // I2c 4 pin GPIO 
 #define INCAN_CL_SLED 25L // Addressable Strip LED
+#define INCAN_CL_DISP 28L // Full screen images/animations
 #define INCAN_CL_CHUTE 32L // 
 // not all of the defines below are supported -- this is lifted from the can-addressing.html 
 // page from wpilip,org 
