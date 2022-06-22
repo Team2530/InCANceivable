@@ -11,7 +11,7 @@
 #include <Wire.h>
 #include <matrix.h>
 #include <PDP.h>
-#include <logo.h>
+#include <splash.h>
 
 #define IDK 0
 #define RED 1
@@ -25,11 +25,11 @@
 #define PROX_NOT_NEAR 8
 
 #define PIN_STRIP1 11
-const int numLEDs = 72;
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
-#define MAX_STRIP_BRIGHTNESS 64
 #define MATRIX_WIDTH 9
 #define MATRIX_HEIGHT 8
+const int numLEDs = MATRIX_WIDTH * MATRIX_HEIGHT;
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(numLEDs, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
+#define MAX_STRIP_BRIGHTNESS 64
 #define NUM_REV_LIGHT_SENSORS 4
 
 VCNL4040 sensor0;
@@ -402,10 +402,10 @@ void stripProgram0(unsigned long now) {
 void stripProgramBoot() {
   matrixPutImage(
     &strip, 
-    (unsigned char*)logo,
+    (unsigned char*)splash,
     0, 0,
     MATRIX_WIDTH, MATRIX_HEIGHT,
-    logo_width, logo_height
+    splash_width, splash_height
   );
 }
 
