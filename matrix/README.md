@@ -20,7 +20,7 @@ In the `matrix.ino` file, change the values of these `#define` fields:
 
 The `data` folder beside the `matrix.ino` file stores the source PNG files. The image dimensions must match the dimensions of the LED panel. Our 2022 robot's panel dimensions are 9x8.
 
-To convert your image, go to the repository's root directory and open the `libraries/MatrixUtils` folder on the command line or terminal. You will need to have Python and pillow (`pip install pillow`) installed to run the converter. The following steps will guide you in structuring the command to input -- don't hit enter until you reach the end:
+To convert your image, go to the repository's root directory and open the `libraries/MatrixUtils` folder on the command line or terminal. You will need Windows (because of the way that the tool interprets paths), Python, and pillow (`pip install pillow`) installed to run the converter. The following steps will guide you in structuring the command to input -- don't hit enter until you reach the end:
 - Type `python .\imgconv.py`, which will run the ImgConv utility.
 - Add a space and append `..\..\matrix\data\<FILENAME>.png`, replacing `<FILENAME>` with the actual file name of your source PNG file.
 - Add a space and append `-o ..\images\<TYPE>.h`, replacing `<TYPE>` with either `splash` or `marquee`, depending on the mode you want your image to run in.
