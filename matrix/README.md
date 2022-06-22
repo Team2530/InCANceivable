@@ -23,7 +23,7 @@ The `data` folder beside the `matrix.ino` file stores the source PNG files. The 
 To convert your image, go to the repository's root directory and open the `libraries/MatrixUtils` folder on the command line or terminal. You will need to have Python and pillow (`pip install pillow`) installed to run the converter. The following steps will guide you in structuring the command to input -- don't hit enter until you reach the end:
 - Type `python .\imgconv.py`, which will run the ImgConv utility.
 - Add a space and append `..\..\matrix\data\<FILENAME>.png`, replacing `<FILENAME>` with the actual file name of your source PNG file.
-- Add a space and append `-o ..\libraries\images\<TYPE>.h`, replacing `<TYPE>` with either `splash` or `marquee`, depending on the mode you want your image to run in.
+- Add a space and append `-o ..\images\<TYPE>.h`, replacing `<TYPE>` with either `splash` or `marquee`, depending on the mode you want your image to run in.
 - Add a space and append `-f string`.
 - If your LED panel has the strips arranged horizontally, add a space and append `-l row`. If your LED panel has the strips arranged vertically, add a space and append `-l column`. Our 2022 robot's panels use column mode.
 - If your LED panel is wired in zigzag formation, add a space and append `-Z` to enable zigzag mode. Our 2022 robot's panels are **not** wired in zigzag formation. Zigzag panel configurations string the strips like this:
