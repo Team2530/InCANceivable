@@ -1,7 +1,7 @@
 /*
 	Made with ImgConv v1.1
 	layout: col-major
-	format: str
+	format: string
 	zigzag: False
 */
 
