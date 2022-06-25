@@ -25,14 +25,19 @@ To convert your image, go to the repository's root directory and open the `libra
 - Add a space and append `..\..\matrix\data\<FILENAME>.png`, replacing `<FILENAME>` with the actual file name of your source PNG file.
 - Add a space and append `-o ..\images\<TYPE>.h`, replacing `<TYPE>` with either `splash` or `marquee`, depending on the mode you want your image to run in.
 - Add a space and append `-f string`.
-- If your LED panel has the strips arranged horizontally, add a space and append `-l row`. If your LED panel has the strips arranged vertically, add a space and append `-l column`. Our 2022 robot's panels use column mode.
-- If your LED panel is wired in zigzag formation, add a space and append `-Z` to enable zigzag mode. Our 2022 robot's panels are **not** wired in zigzag formation. Zigzag panel configurations string the strips like this:
-```
-→→→→→→→→↓
-↓←←←←←←←←
-→→→→→→→→↓
-←←←←←←←←←
-```
-- **VERY IMPORTANT!** If you are running `matrix` on an Arduino, add a space and append `-A` to enable Arduino mode.
+
+- ~~If your LED panel has the strips arranged horizontally, add a space and append `-l row`. If your LED panel has the strips arranged vertically, add a space and append `-l column`. Our 2022 robot's panels use column mode.~~
+- ~~If your LED panel is wired in zigzag formation, add a space and append `-Z` to enable zigzag mode. Our 2022 robot's panels are wired in zigzag formation, but the image-drawing library compensates for this at runtime which removes the need for this feature.~~ 
+- The zigzag (`-Z`) and layout (`-l` )flags have been deprecated in favor of on-the-fly compensation for zigzag wiring. If your panel is wired in a zigzag pattern, use the `zigzag` (or `matZigzag`) argument for functions in [matrix.h](../libraries/MatrixUtils/matrix.h). For matrices wired in row-major or column-major arrangements, use the `colMajor`/`matColMajor` arguments for functions in [matrix.h](../libraries/MatrixUtils/matrix.h). 
+  - Important note: Using default arguments, the [matrix.h](../libraries/MatrixUtils/matrix.h) functions are configured for a column-major zigzagged panel (such as the ones on our robot). 
+  - Zigzag panel configurations string the strips like this:
+    ```
+    →→→→→→→→↓
+    ↓←←←←←←←←
+    →→→→→→→→↓
+    ←←←←←←←←←
+    ```
+
+- **VERY IMPORTANT!** If you are running `matrix` on an Arduino, add a space and append `-A` to enable Arduino mode (Stores data in flash memory).
 
 Once you have the entire command typed out, go ahead and hit enter. When it completes without error, your image has been successfully converted. It will be automatically bundled into the `matrix` sketch when uploading to the Arduino.

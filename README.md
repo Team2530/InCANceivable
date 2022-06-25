@@ -2,7 +2,7 @@
 
 ### FRC Team 2530's framework for programming embedded systems.
 
-InCANceivable is our teams' libraries and Arduino sketches for small independent daughterboards (Arduinos) connected to the CAN bus as accessories/coprocessors.
+InCANceivable is our team's libraries and Arduino sketches for small independent daughterboards (Arduinos) connected to the CAN bus as accessories/coprocessors.
 We are using InCANceivable this season (2022 Rapid React) to run multiple color sensors, proximity sensors, and provide visual feedback from the robot with 2 large LED displays.
 
 ## Hardware

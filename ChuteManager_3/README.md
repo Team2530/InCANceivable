@@ -1,20 +1,12 @@
-# `ChuteManager_3`
+# ChuteManager v3
 
 ### A status viewer for LED panels.
 
 The `ChuteManager_3` sketch is capable of displaying a status board and a splash image, and it can switch between the two on command. The status board shows current alliance, FMS heartbeat, game stage (autonomous or teleop), enabled/disabled status, data from up to 4 color sensors (pointed at the ball chambers in the 2022 season), and a voltage gauge.
 
-![](./feedbackpanel-layout.svg "LED panel layout")
+!["LED panel layout"](./feedbackpanel-layout.svg)
 
 ## Basic configuration
-
-Note that `ChuteManager_3` currently assumes a non-zigzag panel configuration; that is, the strips are strung like this:
-```
-→→→→→→→↙
-↪→→→→→→↙
-↪→→→→→→↙
-↪→→→→→→→
-```
 
 In the `ChuteManager_3.ino` file, change the values of these fields:
 - `PIN_STRIP1` - the pin number that the LED panel is connected to
@@ -29,4 +21,4 @@ See the `matrix` documentation -- this sketch reads the same splash image data t
 
 ## Changing the display mode with an external device
 
-See [this Java subsystem](https://github.com/Team2530/RobotCode2022/blob/38934b8de467ff60d1c1c704b48769e4b2c3c15e/src/main/java/frc/robot/subsystems/FeedbackPanel.java) for an example. "Boot" refers to the splash image. "Status" displays the status board. "Climb" is unused.
+See [this Java subsystem](https://github.com/Team2530/RobotCode2022/blob/38934b8de467ff60d1c1c704b48769e4b2c3c15e/src/main/java/frc/robot/subsystems/FeedbackPanel.java) for an example. "Boot" refers to the splash image. "Status" displays the status board. "Climb" is unimplemented in ChuteManager and therefore undefined behavior.
