@@ -2,7 +2,7 @@ import serial
 from logparser import parseCANID, constructCANID, mfglut, devtylut
 import ctypes as ct
 
-ser = serial.Serial("COM8")
+ser = serial.Serial("COM7")
 ser.baudrate = 115200
 ser.read_all()
 ser.reset_output_buffer()
@@ -26,11 +26,12 @@ while True:
      devcnum, apid) = parseCANID(mesgcsv[1])
     data = mesgcsv[2:]
 
-    if (devcnum != 10):
-        continue
+    # if (devcnum != 10):
+    #     continue
 
     # Bits:
     # print("|".join([bin(d)[2:].ljust(8, '0') for d in data]))
 
     # Full message
-    print(f"TYPE = {devtylut[dvctype]}, MFG = {mfglut[mfgcode]}, NUM = {devcnum}, APID = {apid} : {data}")
+    print(
+        f"TYPE = {devtylut[dvctype]}, MFG = {mfglut[mfgcode]}, NUM = {devcnum}, APID = {apid} : {data}")
