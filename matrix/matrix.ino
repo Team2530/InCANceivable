@@ -1,18 +1,22 @@
 #include <Adafruit_NeoPixel.h>
 #include <marquee.h>
 #include <matrix.h>
-#include <logo.h>
+#include <splash.h>
 #include <imgconv_utils.h>
 
 #define PIN_STRIP1 11
 #define MATRIX_WIDTH 9
 #define MATRIX_HEIGHT 8
+#define BRIGHTNESS 64
+
+#define FRAME_DURATION 80
+#define SPLASH_FRAMES 100
+
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(MATRIX_WIDTH * MATRIX_HEIGHT, PIN_STRIP1, NEO_GRB + NEO_KHZ800);
 
 void setup() {
   strip.begin();
-  // Anything more is hard to look at :P
-  strip.setBrightness(64);
+  strip.setBrightness(BRIGHTNESS);
   // Serial.println("Setup");
 }
 
@@ -20,16 +24,17 @@ void loop() {
   static unsigned int offset = 0;
   static unsigned int t = 0;
 
-  // Display the sqrt(-1) inconceivable logo for 8k millis before scrolling the banner.
-  if (t < 100) {
+  // Display the splash image for the specified amount of frames before scrolling the banner.
+  // -1 will permanently display the splash image.
+  if (t < SPLASH_FRAMES || t == -1) {
     matrixPutImage(
       &strip, 
-      (unsigned char*)logo,
+      (unsigned char*)splash,
       0, 0,
       MATRIX_WIDTH, MATRIX_HEIGHT,
-      logo_width, logo_height
+      splash_width, splash_height
     );
-    ++t; // In here to prevent overflow repetition.
+    if (t != -1) ++t; // In here to prevent overflow repetition.
     strip.show();
   } else {
     // Ooh more concise library functions :)
@@ -51,5 +56,5 @@ void loop() {
   }
 
   // Scroll delay
-  delay(80);
+  delay(FRAME_DURATION);
 }

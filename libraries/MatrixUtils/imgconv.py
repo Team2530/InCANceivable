@@ -2,8 +2,11 @@
 # python .\imgconv.py .\data\1.png -o ..\libraries\images\img.h -A -Z -l col
 # python .\imgconv.py ..\..\matrix\data\marquee2.png -o ..\images\marquee.h -f string -A
 
+# TODO: Unix path support
+
 from PIL import Image
-import sys, os
+import sys
+import os
 import imghdr
 
 args = sys.argv[1:]
@@ -37,7 +40,10 @@ if (len(args) < 1):
         <name>_depth (specifying number of channels)
         <name>_numframes (only for multiple frames)
         <name>_names (filenames, only for multiple frames)
-    """) 
+        
+    Example useage:
+        .\imgconv.py ..\..\matrix\data\marquee.png -o ..\images\marquee.h -f string -A
+    """)
     exit(1)
 
 # Base arguments
@@ -73,7 +79,7 @@ if ('-o' in args):
     #re.sub(r'\W+', '', (inp if is_directory else inp.split('.')[0]))
     outfile = args[oi + 1]
     name = args[oi + 1].split("\\")[-1].split(".")[0]
-    
+
 if ('-f' in args):
     fi = args.index('-f')
     if (len(args)-1 <= fi or args[fi + 1].lower() not in valid_formats):
@@ -87,38 +93,43 @@ if ('-l' in args):
         print("Error, layout (-l) must be followed by a valid layout (column|col|c, row|r)")
         exit(1)
     layout = args[li + 1].lower()
-    
+
 out = []
 # Find and sort images, if a directory is passed
-imagenames = list([f"{inp}/{img}" for img in os.listdir(inp) if imghdr.what(f"{inp}/{img}") != None]) if is_directory else [inp]
-imagenames = sorted(imagenames, key=lambda name: not name[0].isdigit() or int(name.split('.')[0]))
+imagenames = list([f"{inp}/{img}" for img in os.listdir(inp)
+                  if imghdr.what(f"{inp}/{img}") != None]) if is_directory else [inp]
+imagenames = sorted(
+    imagenames, key=lambda name: not name[0].isdigit() or int(name.split('.')[0]))
 
 width = -1
 height = -1
 depth = -1
 
-# Put all images into output format, even if there is only one. 
+# Put all images into output format, even if there is only one.
 # will handle writing to file/C-specific formatting later
 for imagename in imagenames:
     encoded = ""
-    
+
     image = Image.open(imagename)
-    if height == -1: 
+    image.convert("RGB")
+
+    if height == -1:
         height = image.height
         width = image.width
     # All frames must be identically sized.
     assert height == image.height and width == image.width
-        
+
     # Helper for DRYer code
     def outpixel(x, y):
         pix = image.getpixel((x, y))
         # Grayscale images won't be a tuple according to pillow docs, so convert it for consistency
         pix = list(pix) if isinstance(pix, tuple) else [pix]
-        
+
         global depth
-        if depth == -1: depth = len(pix)
-        assert depth == len(pix) # Ensure consistently channel-d images
-        
+        if depth == -1:
+            depth = len(pix)
+        assert depth == len(pix)  # Ensure consistently channel-d images
+
         # Output the pixel depending on output format
         match format:
             case "hex" | "h":
@@ -132,14 +143,16 @@ for imagename in imagenames:
     if (layout in ["row", "r"]):
         for y in range(image.height):
             for x in range(image.width):
-                if (zigzag and (y%2) == 0): x = (image.width-1) - x;
+                if (zigzag and (y % 2) == 0):
+                    x = (image.width-1) - x
                 encoded += outpixel(x, y)
     else:
         for x in range(image.width):
             for y in range(image.height):
-                if (zigzag and (x%2) == 0): y = (image.height-1) - y;
+                if (zigzag and (x % 2) == 0):
+                    y = (image.height-1) - y
                 encoded += outpixel(x, y)
-        
+
     out.append(encoded)
 
 # ImgConv header
@@ -157,8 +170,10 @@ if (len(out) == 1):
     # NOTE: String output requires 1 byte more for null terminator.
     output_text += f"{prefix}unsigned char {name}[{width*height*depth + (1 if format[0] == 's' else 0)}] {suffix}"
     # Strings are special
-    if format[0] == 's': output_text += f"= \"{out[0]}\";" 
-    else: output_text +="= {\n\t" + out[0] + "\n};"
+    if format[0] == 's':
+        output_text += f"= \"{out[0]}\";"
+    else:
+        output_text += "= {\n\t" + out[0] + "\n};"
 else:
     # Number of frames and frame filenames, for multiple frame collections
     output_text += f"unsigned int {name}_numframes = {len(imagenames)};\n\n"
@@ -167,7 +182,7 @@ else:
         i = imagename.split("/")[-1]
         output_text += f"\t\"{i}\",\n"
     output_text += "};\n\n"
-    
+
     # Output frames as an array-of-arrays, one 1D array per frame.
     output_text += f"{prefix}unsigned char {name}[][{width*height*depth + (1 if format[0] == 's' else 0)}] {suffix}" + "= {"
     for o in out:
