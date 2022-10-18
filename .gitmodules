@@ -1,0 +1,21 @@
+[submodule "libraries/SparkFun_VCNL4040_Arduino_Library"]
+	path = libraries/SparkFun_VCNL4040_Arduino_Library
+	url = https://github.com/sparkfun/SparkFun_VCNL4040_Arduino_Library
+[submodule "libraries/MCP_CAN_lib"]
+	path = libraries/MCP_CAN_lib
+	url = https://github.com/coryjfowler/MCP_CAN_lib
+[submodule "libraries/Seeed_Arduino_CAN"]
+	path = libraries/Seeed_Arduino_CAN
+	url = https://github.com/Seeed-Studio/Seeed_Arduino_CAN
+[submodule "libraries/AS5145_Arduino"]
+	path = libraries/AS5145_Arduino
+	url = https://github.com/fushuhao6/AS5145_Arduino
+[submodule "libraries/--help"]
+	path = libraries/--help
+	url = https://github.com/adafruit/Adafruit_NeoPixel
+[submodule "libraries/Neopixel"]
+	path = libraries/Neopixel
+	url = https://github.com/adafruit/Adafruit_NeoPixel
+[submodule "libraries/Longan_CAN_MCP2515"]
+	path = libraries/Longan_CAN_MCP2515
+	url = https://github.com/Longan-Labs/Longan_CAN_MCP2515
