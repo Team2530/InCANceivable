@@ -1,6 +1,0 @@
-#include <team2530_VCNL4040.h>
-
-VCNL4040* setup_VCNL4040(){
-  VCNL4040 sensor;
-  
-}
